@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameVault — Latest Updates</title>
+  <link rel="icon" type="image/jpg" href="../images/Logo.jpg">
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .updates-section {
+      max-width: 1400px; margin: 0 auto;
+      padding: 0 5% 70px; position: relative; z-index: 1;
+    }
+
+    .update-group {
+      background: var(--color-surface-2);
+      border: 1px solid var(--color-border);
+      border-radius: 18px; margin-bottom: 12px; overflow: hidden;
+      transition: border-color .25s;
+      animation: fadeUp .32s ease both;
+    }
+    .update-group:hover { border-color: var(--color-primary); }
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0);    }
+    }
+    .update-group summary {
+      list-style: none; cursor: pointer;
+      padding: 14px 20px;
+      display: flex; justify-content: space-between; align-items: center; gap: 12px;
+      transition: background .18s; user-select: none;
+    }
+    .update-group summary::-webkit-details-marker { display: none; }
+    .update-group summary:hover { background: rgba(255,255,255,0.03); }
+    .update-group[open] > summary {
+      background: rgba(99,102,241,0.07);
+      border-bottom: 1px solid var(--color-border);
+    }
+    .summary-left { display: flex; align-items: center; gap: 11px; flex: 1; min-width: 0; }
+    .chevron {
+      width: 22px; height: 22px; border-radius: 7px; flex-shrink: 0;
+      background: var(--color-surface-2); display: flex; align-items: center; justify-content: center;
+      color: var(--color-primary); font-size: 10px; font-weight: 700;
+      transition: transform .28s cubic-bezier(.4,0,.2,1), background .2s, color .2s;
+    }
+    .update-group[open] .chevron {
+      transform: rotate(180deg);
+      background: var(--color-primary); color: #fff;
+    }
+    .date-info { line-height: 1.2; min-width: 0; }
+    .date-main {
+      font-size: 14px; font-weight: 700; color: var(--color-text);
+      display: flex; align-items: baseline; gap: 0; flex-wrap: wrap;
+    }
+    .date-day  { font-size: 20px; font-weight: 900; color: var(--color-primary); margin-right: 5px; line-height: 1; }
+    .date-rel  { font-size: 11px; color: var(--color-muted); font-weight: 400; margin-left: 6px; }
+    .summary-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .tag-today {
+      background: rgba(0,255,163,.1); color: #00ffa3;
+      border: 1px solid rgba(0,255,163,.25);
+      padding: 3px 9px; border-radius: 20px; font-size: 10px; font-weight: 800;
+      letter-spacing: .5px; white-space: nowrap;
+    }
+    .tag-count {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      padding: 5px 13px; border-radius: 20px; font-size: 11px; font-weight: 700;
+      color: #fff; white-space: nowrap;
+    }
+
+    .updates-grid {
+      padding: 16px;
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
+      gap: 10px;
+    }
+
+    .update-card {
+      background: var(--color-surface-2); border-radius: 11px; overflow: hidden;
+      border: 1px solid var(--color-border);
+      display: flex; flex-direction: column;
+      transition: transform .2s, border-color .2s, box-shadow .2s;
+    }
+    .update-card:hover {
+      transform: translateY(-4px) scale(1.025);
+      border-color: var(--color-primary);
+      box-shadow: 0 10px 28px rgba(99,102,241,.22);
+    }
+    .update-thumb {
+      position: relative; height: 122px; overflow: hidden;
+      flex-shrink: 0; background: var(--color-surface-2);
+    }
+    .update-thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform .35s;
+    }
+    .update-card:hover .update-thumb img { transform: scale(1.07); }
+    .update-thumb .no-img {
+      width: 100%; height: 100%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 28px; color: var(--color-muted);
+    }
+    .update-overlay {
+      position: absolute; inset: 0;
+      background: rgba(13,15,20,0.75);
+      display: flex; align-items: flex-end; justify-content: center;
+      padding-bottom: 10px;
+      opacity: 0; transition: opacity .25s;
+    }
+    .update-card:hover .update-overlay { opacity: 1; }
+    .update-dl-btn {
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-hover));
+      color: #fff; text-decoration: none;
+      font-size: 9px; font-weight: 800; letter-spacing: .7px;
+      padding: 6px 14px; border-radius: 6px; text-transform: uppercase;
+      transition: filter .2s, transform .15s;
+    }
+    .update-dl-btn:hover { filter: brightness(1.18); transform: scale(0.97); }
+    .update-info { padding: 7px 7px 3px; flex: 1; }
+    .update-category {
+      display: inline-block;
+      background: rgba(99,102,241,.15); color: var(--color-primary);
+      padding: 2px 6px; border-radius: 20px; font-size: 9px; font-weight: 700;
+      letter-spacing: .3px; text-transform: uppercase; max-width: 100%;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
+    .update-info h3 {
+      margin-top: 4px; font-size: 11px; font-weight: 700; color: var(--color-text);
+      line-height: 1.3;
+      display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+    }
+
+
+    @media (max-width: 700px) {
+      .updates-section { padding: 0 4% 50px; }
+      .updates-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
+      .update-thumb { height: 108px; }
+    }
+    @media (max-width: 380px) {
+      .updates-grid { grid-template-columns: repeat(3, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="bg-overlay"></div>
+<div class="grid-overlay"></div>
+<div class="content-wrap">
+
+
+<header class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="navbar__inner">
+    <a href="../index.html" class="navbar__logo">
+      <img src="../images/icon.png" alt="GameVault" style="height:120px;width:auto;">
+    </a>
+    <ul class="navbar__links">
+      <li><a href="../index.html" class="navbar__link">Home</a></li>
+      <li><a href="updates.html" class="navbar__link active">Updates</a></li>
+      <li><a href="ann.html" class="navbar__link">News</a></li>
+      <li><a href="faq.html" class="navbar__link">Support</a></li>
+    </ul>
+    <div class="navbar__actions">
+      <button class="navbar__hamburger" id="nav-hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <nav class="navbar__mobile" id="nav-mobile">
+    <a href="../index.html" class="navbar__mobile-link">Home</a>
+    <a href="updates.html" class="navbar__mobile-link">Updates</a>
+    <a href="ann.html" class="navbar__mobile-link">News</a>
+    <a href="faq.html" class="navbar__mobile-link">Support</a>
+  </nav>
+</header>
+
+
+<div class="ann-page-hero container">
+  <div class="ann-eyebrow">
+    <span>Latest Releases</span>
+  </div>
+  <h1>Updates</h1>
+  <p id="pageSubtext">Loading catalog…</p>
+</div>
+
+
+<section class="updates-section">
+  <div id="updatesContainer">
+    <div class="loading-state">
+      <div class="spinner"></div>
+      <p>Fetching latest games…</p>
+    </div>
+  </div>
+</section>
+
+
+<footer class="footer">
+  <div class="footer__grid container">
+    <div class="footer__col">
+      <a href="../index.html" style="display:inline-block;margin-bottom:1rem;">
+        <img src="../images/icon2.png" alt="GameVault" style="height:200px;width:auto;">
+      </a>
+      <p class="footer__brand">Premium game downloads platform. Instant access, no setup required. 400+ games available.</p>
+      <div class="footer__social">
+        <a href="https://www.facebook.com/profile.php?id=61590194378758" target="_blank" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Quick Links</div>
+      <div class="footer__links">
+        <a href="../index.html">Home</a>
+        <a href="ann.html">News</a>
+        <a href="faq.html">Support</a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Support</div>
+      <div class="footer__links">
+        <a href="faq.html">FAQ</a>
+        <a href="payment.html">Payment Plans</a>
+        <a href="ann.html">Announcements</a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Legal</div>
+      <div class="footer__links">
+        <a href="privacy.html">Privacy Policy</a>
+        <a href="terms.html">Terms of Service</a>
+        <a href="refund.html">Refund Policy</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <span>© 2026 GameVault — All rights reserved.</span>
+    <div class="footer__legal">
+      <a href="privacy.html">Privacy</a>
+      <a href="terms.html">Terms</a>
+    </div>
+  </div>
+</footer>
+
+<script>window.GAMES_CATALOG = [];</script>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
+    authDomain: 'gamevault-6f5b1.firebaseapp.com',
+    projectId: 'gamevault-6f5b1',
+    storageBucket: 'gamevault-6f5b1.firebasestorage.app',
+    messagingSenderId: '958994391207',
+    appId: '1:958994391207:web:7c398da9bc39437c7ebb82'
+  };
+
+  let app, db;
+  try {
+    app = initializeApp(firebaseConfig);
+    db = getFirestore(app);
+  } catch (e) {
+    console.warn("Firebase init error", e);
+    db = null;
+  }
+
+  function todayISO() {
+    const d = new Date();
+    return d.getFullYear() + '-' + ('0'+(d.getMonth()+1)).slice(-2) + '-' + ('0'+d.getDate()).slice(-2);
+  }
+
+  function tsToISO(ts) {
+    if (!ts) return null;
+    try {
+      if (typeof ts?.toDate === 'function') return ts.toDate().toISOString().slice(0,10);
+      if (ts instanceof Date) return ts.toISOString().slice(0,10);
+      if (typeof ts === 'string') return ts.slice(0,10);
+      if (typeof ts === 'number') return new Date(ts).toISOString().slice(0,10);
+    } catch (_) {}
+    return null;
+  }
+
+  function dateLabel(iso) {
+    if (!iso) return 'Unknown';
+    try {
+      return new Date(iso).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
+    } catch { return iso; }
+  }
+
+  function relLabel(iso, today) {
+    const diff = Math.round((new Date(today) - new Date(iso)) / 86400000);
+    if (diff === 0) return 'today';
+    if (diff === 1) return 'yesterday';
+    if (diff <= 6)  return diff + 'd ago';
+    if (diff <= 13) return '1 week ago';
+    if (diff <= 20) return '2 weeks ago';
+    return null;
+  }
+
+  function esc(s) {
+    if (s === undefined || s === null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function isValidThumb(url) {
+    if (!url || typeof url !== 'string') return false;
+    const trimmed = url.trim();
+    if (trimmed === '' || trimmed === 'null' || trimmed === '#') return false;
+    return trimmed.startsWith('http://') || trimmed.startsWith('https://');
+  }
+
+  function cardHtml(g) {
+    const hasThumb = isValidThumb(g.thumb);
+    const thumbHtml = hasThumb
+      ? `<img src="${esc(g.thumb)}" alt="${esc(g.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="no-img" style="display:none">🎮</div>`
+      : '<div class="no-img">🎮</div>';
+    const dlDisabled = !g.downloadUrl || g.downloadUrl === '#';
+    const btnHtml = dlDisabled
+      ? '<span class="update-dl-btn" style="opacity:.6;cursor:default;background:var(--color-surface-2)">Coming Soon</span>'
+      : `<a href="${esc(g.downloadUrl)}" target="_blank" rel="noopener" class="update-dl-btn">⬇ DOWNLOAD NOW</a>`;
+    return `<div class="update-card">
+      <div class="update-thumb">${thumbHtml}<div class="update-overlay">${btnHtml}</div></div>
+      <div class="update-info">
+        <span class="update-category">${esc(g.category || 'Game')}</span>
+        <h3>${esc(g.name || 'Untitled')}</h3>
+      </div>
+    </div>`;
+  }
+
+  function render(allGames) {
+    const container = document.getElementById('updatesContainer');
+    const TODAY = todayISO();
+
+    if (!allGames || !allGames.length) {
+      container.innerHTML = '<div class="empty-state">No games yet.</div>';
+      document.getElementById('pageSubtext').textContent = '0 games';
+      return;
+    }
+
+    const seen = new Set();
+    const unique = allGames.filter(g => {
+      const k = g.name?.toLowerCase();
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+
+    const CATALOG_KEY = 'catalog';
+    const groups = {};
+
+    unique.forEach(g => {
+      let dateKey = CATALOG_KEY;
+      const fromFirestore = g._source === 'firestore';
+      let addedTimestamp = null;
+      if (fromFirestore && (g.createdAt || g.created_at)) {
+        addedTimestamp = tsToISO(g.createdAt || g.created_at);
+        if (addedTimestamp) dateKey = addedTimestamp;
+      } else if (g.addedDate && /^\d{4}-\d{2}-\d{2}$/.test(g.addedDate)) {
+        dateKey = g.addedDate;
+      }
+      if (!groups[dateKey]) groups[dateKey] = [];
+      groups[dateKey].push(g);
+    });
+
+    const sortedKeys = Object.keys(groups).sort((a,b) => {
+      if (a === CATALOG_KEY) return 1;
+      if (b === CATALOG_KEY) return -1;
+      return a < b ? 1 : -1;
+    });
+
+    const fsCount = unique.filter(g => g._source === 'firestore').length;
+    document.getElementById('pageSubtext').textContent = `${unique.length} games total · ${fsCount} added via dashboard`;
+
+    container.innerHTML = sortedKeys.map((dateKey, idx) => {
+      const games = groups[dateKey];
+      const isCatalog = dateKey === CATALOG_KEY;
+      const isToday = dateKey === TODAY;
+      const label = isCatalog ? 'Pre-loaded Catalog' : dateLabel(dateKey);
+      const rel = isCatalog ? null : relLabel(dateKey, TODAY);
+
+      return `<details class="update-group"${idx === 0 ? ' open' : ''} style="animation-delay:${idx*0.045}s">
+        <summary>
+          <div class="summary-left">
+            <div class="chevron">▾</div>
+            <div class="date-info">
+              <div class="date-main">${esc(label)}${rel ? `<span class="date-rel"> (${rel})</span>` : ''}</div>
+            </div>
+          </div>
+          <div class="summary-right">
+            ${isToday ? '<span class="tag-today">● TODAY</span>' : ''}
+            ${isCatalog ? '<span class="tag-count" style="background:var(--color-surface-2);color:var(--color-text-2)">'+games.length+' Games</span>' : '<span class="tag-count">'+games.length+' Update'+(games.length!==1?'s':'')+'</span>'}
+          </div>
+        </summary>
+        <div class="updates-grid">${games.map(cardHtml).join('')}</div>
+      </details>`;
+    }).join('');
+  }
+
+  function waitForCatalog(timeout = 2000) {
+    return new Promise(resolve => {
+      if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) {
+        resolve(window.GAMES_CATALOG);
+        return;
+      }
+      let elapsed = 0;
+      const interval = 100;
+      const check = setInterval(() => {
+        elapsed += interval;
+        if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) {
+          clearInterval(check);
+          resolve(window.GAMES_CATALOG);
+        } else if (elapsed >= timeout) {
+          clearInterval(check);
+          console.warn('GAMES_CATALOG not found after timeout, using empty catalog');
+          resolve([]);
+        }
+      }, interval);
+    });
+  }
+
+  async function startSafeListener() {
+    const rawCatalog = await waitForCatalog(2500);
+    const catalog = (rawCatalog || []).map(g => ({
+      ...g,
+      id: String(g.id || ''),
+      _source: 'catalog',
+      status: g.status || 'active',
+      downloads: g.downloads || 0,
+      name: g.name || 'Unknown'
+    }));
+
+    // Show catalog immediately
+    render(catalog);
+
+    if (!db) return;
+
+    try {
+      onSnapshot(collection(db, 'games'),
+        (snap) => {
+          const fsGames = snap.docs.map(d => ({ ...d.data(), id: d.id, _source: 'firestore' }))
+            .filter(g => g.status !== 'hidden');
+          const fsNames = new Set(fsGames.map(g => g.name?.toLowerCase()));
+          const catalogOnly = catalog.filter(g => !fsNames.has(g.name?.toLowerCase()));
+          render([...fsGames, ...catalogOnly]);
+        },
+        () => {}
+      );
+    } catch (_) {}
+  }
+
+  startSafeListener();
+</script>
+
+</div>
+
+<script>
+function initBg() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, animId;
+  const particles = [];
+  const PARTICLE_COUNT = 35;
+  const CONNECT_DIST = 100;
+  const isMobile = window.innerWidth < 768;
+
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) particles.push({
+    x: Math.random() * w, y: Math.random() * h,
+    vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+    r: 1 + Math.random()
+  });
+
+  let skip = 0;
+  function draw() {
+    animId = requestAnimationFrame(draw);
+    skip++; if (skip % 3) return;
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i]; p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(45,212,191,0.18)'; ctx.fill();
+    }
+    if (!isMobile) {
+      for (let i = 0; i < particles.length; i++) for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+        if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECT_DIST) {
+          ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(45,212,191,${0.04 * (1 - dist / CONNECT_DIST)})`;
+          ctx.lineWidth = 0.5; ctx.stroke();
+        }
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(animId); else draw(); });
+  draw();
+}
+initBg();
+
+// Hamburger menu toggle
+const hamburger = document.getElementById('nav-hamburger');
+const mobileNav = document.getElementById('nav-mobile');
+if (hamburger && mobileNav) {
+  hamburger.addEventListener('click', () => {
+    hamburger.classList.toggle('active');
+    mobileNav.classList.toggle('open');
+  });
+  mobileNav.querySelectorAll('.navbar__mobile-link').forEach(link => {
+    link.addEventListener('click', () => {
+      hamburger.classList.remove('active');
+      mobileNav.classList.remove('open');
+    });
+  });
+}
+</script>
+
+</body>
+</html>
