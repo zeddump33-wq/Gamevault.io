@@ -1,17 +1,50 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta http-equiv="X-Frame-Options" content="DENY" />
+  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
   <title>GameVault — Latest Updates</title>
-  <link rel="icon" type="image/jpg" href="../images/Logo.jpg">
+  <link rel="icon" type="image/png" href="../images/Logo.jpg">
   <link rel="stylesheet" href="../css/style.css">
   <style>
+    #loadingOverlay {
+      position: fixed; inset: 0; z-index: 99999;
+      background: radial-gradient(ellipse at center, #0a0d16 0%, #05070c 100%);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+      transition: opacity 0.6s ease, visibility 0.6s ease;
+      overflow: hidden;
+    }
+    #loadingOverlay.hide { opacity: 0; visibility: hidden; pointer-events: none; }
+    .load-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; }
+    .load-logo { font-size: 32px; font-weight: 900; letter-spacing: 6px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .load-text { font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #8892b0; }
+    .load-bar-wrap { width: 260px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
+    .load-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 99px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
+    #protected-content { display: none; }
+    #accessModal { display: none; }
+    #revokedOverlay { display: none; position: fixed; inset: 0; background: rgba(5,7,12,0.97); backdrop-filter: blur(16px); z-index: 20000; align-items: center; justify-content: center; }
+    #revokedOverlay.show { display: flex; }
+    .revoked-card { background: rgba(18,22,30,0.92); border-radius: 36px; border: 1px solid rgba(255,100,100,0.3); padding: 40px 36px; max-width: 420px; text-align: center; }
+    .revoked-icon { font-size: 52px; margin-bottom: 16px; }
+    .revoked-card h2 { font-size: 24px; font-weight: 800; background: linear-gradient(120deg, #ff8a7a, #ff4545); background-clip: text; -webkit-background-clip: text; color: transparent; }
+    .revoked-card p { color: #b9c3e0; font-size: 14px; margin: 16px 0; }
+    #expiryBadge { display: none; margin: 12px auto 0; background: #1e2430; border-radius: 30px; padding: 7px 16px; font-size: 12px; color: #e7b42c; width: fit-content; }
+    #expiryBadge.show { display: block; }
+    #expiryTicker { display: none; position: fixed; bottom: 20px; right: 20px; background: rgba(18,22,30,0.92); backdrop-filter: blur(8px); border: 1px solid #2a2f3c; border-radius: 40px; padding: 8px 18px; font-size: 12px; color: #e7b42c; z-index: 5000; }
+    #expiryTicker.show { display: block; }
+    #expiryTicker.urgent { border-color: #c24a4a; color: #ff8a7a; animation: pulse 1s infinite; }
+    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+    .toast-msg { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(18,22,30,0.95); border: 1px solid rgba(45,212,191,0.3); border-radius: 30px; padding: 10px 22px; font-size: 13px; color: #e2e8f0; z-index: 9999; animation: fadeUp 0.2s ease; backdrop-filter: blur(8px); white-space: nowrap; }
+    @keyframes fadeUp { from{opacity:0;transform:translate(-50%,8px);} to{opacity:1;transform:translate(-50%,0);} }
+
     .updates-section {
       max-width: 1400px; margin: 0 auto;
       padding: 0 5% 70px; position: relative; z-index: 1;
     }
-
     .update-group {
       background: var(--color-surface-2);
       border: 1px solid var(--color-border);
@@ -66,14 +99,12 @@
       padding: 5px 13px; border-radius: 20px; font-size: 11px; font-weight: 700;
       color: #fff; white-space: nowrap;
     }
-
     .updates-grid {
       padding: 16px;
       display: grid;
       grid-template-columns: repeat(auto-fill, minmax(108px, 1fr));
       gap: 10px;
     }
-
     .update-card {
       background: var(--color-surface-2); border-radius: 11px; overflow: hidden;
       border: 1px solid var(--color-border);
@@ -128,8 +159,6 @@
       line-height: 1.3;
       display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
     }
-
-
     @media (max-width: 700px) {
       .updates-section { padding: 0 4% 50px; }
       .updates-grid { grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; }
@@ -142,11 +171,20 @@
 </head>
 <body>
 
+<div id="loadingOverlay">
+  <div class="load-content">
+    <div class="load-logo"><img src="../images/icon.png" alt="GameVault" style="height:48px;"></div>
+    <div class="load-text" id="loadText">Initializing...</div>
+    <div class="load-bar-wrap"><div class="load-bar" id="loadBar" style="width:60%"></div></div>
+  </div>
+</div>
+
 <canvas id="bgCanvas"></canvas>
 <div class="bg-overlay"></div>
 <div class="grid-overlay"></div>
 <div class="content-wrap">
 
+<div id="protected-content">
 
 <header class="navbar" role="navigation" aria-label="Main navigation">
   <div class="navbar__inner">
@@ -160,6 +198,7 @@
       <li><a href="faq.html" class="navbar__link">Support</a></li>
     </ul>
     <div class="navbar__actions">
+      <span id="userBadge" style="display:none; font-size:10px; font-weight:800; padding:2px 10px; border-radius:20px; letter-spacing:0.5px; white-space:nowrap;"></span>
       <button class="navbar__hamburger" id="nav-hamburger" aria-label="Toggle menu">
         <span></span><span></span><span></span>
       </button>
@@ -173,7 +212,6 @@
   </nav>
 </header>
 
-
 <div class="ann-page-hero container">
   <div class="ann-eyebrow">
     <span>Latest Releases</span>
@@ -181,7 +219,6 @@
   <h1>Updates</h1>
   <p id="pageSubtext">Loading catalog…</p>
 </div>
-
 
 <section class="updates-section">
   <div id="updatesContainer">
@@ -191,7 +228,6 @@
     </div>
   </div>
 </section>
-
 
 <footer class="footer">
   <div class="footer__grid container">
@@ -232,18 +268,60 @@
     </div>
   </div>
   <div class="footer__bottom">
-    <span>© 2026 GameVault — All rights reserved.</span>
+    <span>&copy; 2026 GameVault — All rights reserved.</span>
     <div class="footer__legal">
       <a href="privacy.html">Privacy</a>
       <a href="terms.html">Terms</a>
     </div>
   </div>
 </footer>
+</div>
+
+<div id="expiryTicker"><span id="expiryTickerText"></span></div>
+
+<div id="accessModal" class="access-modal-overlay">
+  <div class="access-modal glass-panel">
+    <h2>Secure Access Required</h2>
+    <p>Enter your access code <strong>or</strong> choose a plan</p>
+    <input type="text" id="accessCodeInput" class="access-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off">
+    <input type="email" id="accessEmailInput" class="access-input" placeholder="Email Address (optional if you have a VIP code)" autocomplete="email" style="margin-top:8px;">
+    <div id="accessError" class="access-error"></div>
+    <button id="verifyAccessBtn" class="verify-btn">UNLOCK GAMEVAULT</button>
+    <a href="payment.html" target="_blank" class="view-plans-btn" style="display:inline-block; text-decoration:none; margin-top:18px;">
+      <span></span> VIEW ACCESS PLANS <span></span>
+    </a>
+    <div id="plansWrapper" class="plans-wrapper">
+      <div class="plans-grid">
+        <div class="plan-card"><div class="featured-badge" style="background:linear-gradient(135deg,#10b981,#059669);font-size:0.55rem;padding:2px 8px;">MEMBER</div><div class="plan-name">2 DAYS</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">&#8369;65</span> &#8369;55</div><ul class="plan-features"><li>1 Device</li><li>All Downloads</li><li>Fast Activation</li></ul><button class="get-access-btn" onclick="window.open('payment.html','_blank')">Get Access</button></div>
+        <div class="plan-card"><div class="featured-badge" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);font-size:0.55rem;padding:2px 8px;">ELITE</div><div class="plan-name">3 DAYS</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">&#8369;99</span> &#8369;65</div><ul class="plan-features"><li>3 Devices</li><li>All Downloads</li><li>Fast Activation</li></ul><button class="get-access-btn" onclick="window.open('payment.html','_blank')">Get Access</button></div>
+        <div class="plan-card featured"><div class="featured-badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444);font-size:0.55rem;padding:2px 8px;">VIP</div><div class="plan-name">LIFETIME</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">&#8369;129</span> &#8369;99</div><ul class="plan-features"><li>Any Device</li><li>Unlimited Downloads</li><li>Lifetime Access</li></ul><button class="get-access-btn" onclick="window.open('payment.html','_blank')">Get Access</button></div>
+      </div>
+      <p style="font-size:0.65rem; color:#6f7893; margin-top:12px;">After payment, enter your email to receive the access code instantly.</p>
+    </div>
+    <div id="expiryBadge"><span id="expiryBadgeText"></span></div>
+    <div class="modal-footer">Need help? Contact support on Facebook</div>
+  </div>
+</div>
+
+<div id="revokedOverlay">
+  <div class="revoked-card">
+    <div class="revoked-icon" id="revokedIcon"></div>
+    <h2 id="revokedTitle">Access Revoked</h2>
+    <p id="revokedMsg">Your access code has been disabled or expired.</p>
+    <div class="sub">Contact support.</div>
+  </div>
+</div>
+
+</div>
 
 <script>window.GAMES_CATALOG = [];</script>
+
 <script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+  import {
+    getFirestore, doc, getDoc, onSnapshot, updateDoc, serverTimestamp,
+    collection, increment
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -254,13 +332,215 @@
     appId: '1:958994391207:web:7c398da9bc39437c7ebb82'
   };
 
-  let app, db;
-  try {
-    app = initializeApp(firebaseConfig);
-    db = getFirestore(app);
-  } catch (e) {
-    console.warn("Firebase init error", e);
-    db = null;
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  const KEY_ACCESS = 'gv_access';
+  const KEY_CODE = 'gv_code';
+  const KEY_SESSION = 'gv_session';
+  const KEY_EMAIL = 'gv_email';
+
+  function _h(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; } return (h >>> 0).toString(36); }
+  function _setAccess(code) { localStorage.setItem(KEY_ACCESS, _h('gv:' + code + ':2026')); }
+  function _isAccess(code) { return !!code && localStorage.getItem(KEY_ACCESS) === _h('gv:' + code + ':2026'); }
+
+  function getSessionId() {
+    let sid = localStorage.getItem(KEY_SESSION);
+    if (!sid) {
+      sid = 'sess_' + Math.random().toString(36).slice(2,18) + Date.now().toString(36);
+      localStorage.setItem(KEY_SESSION, sid);
+    }
+    return sid;
+  }
+
+  let liveUnsubscribe = null;
+  let expiryInterval = null;
+
+  function showError(msg) {
+    document.getElementById('accessError').innerText = msg;
+  }
+
+  function showToast(msg, duration) {
+    let el = document.querySelector('.toast-msg');
+    if (el) el.remove();
+    el = document.createElement('div');
+    el.className = 'toast-msg';
+    el.innerText = msg;
+    document.body.appendChild(el);
+    setTimeout(() => el && el.remove(), duration || 1800);
+  }
+
+  function uiReady() { document.getElementById('loadingOverlay').classList.add('hide'); }
+
+  function showTierBadge(tier) {
+    const el = document.getElementById('userBadge');
+    const styles = { member: { label: 'MEMBER', bg: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff' }, elite: { label: 'ELITE', bg: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', color: '#fff' }, vip: { label: 'VIP', bg: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff' } };
+    const cfg = styles[tier] || styles.elite;
+    el.textContent = cfg.label;
+    el.style.background = cfg.bg;
+    el.style.color = cfg.color;
+    el.style.display = 'inline-block';
+  }
+
+  function startExpiryTicker(expiresAt) {
+    if (expiryInterval) clearInterval(expiryInterval);
+    if (!expiresAt) return;
+    const ticker = document.getElementById('expiryTicker');
+    const tickerText = document.getElementById('expiryTickerText');
+    ticker.classList.add('show');
+    function update() {
+      const diff = expiresAt - Date.now();
+      if (diff <= 0) { clearInterval(expiryInterval); showRevoked('expired'); return; }
+      const days = Math.floor(diff / 86400000);
+      const hours = Math.floor((diff % 86400000) / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+      const seconds = Math.floor((diff % 60000) / 1000);
+      tickerText.textContent = days > 0 ? `Access Remaining: ${days}d ${hours}h ${minutes}m ${seconds}s` : `Access Remaining: ${hours}h ${minutes}m ${seconds}s`;
+      ticker.classList.toggle('urgent', diff < 3600000);
+    }
+    update();
+    expiryInterval = setInterval(update, 1000);
+  }
+
+  function startLiveListener(codeKey) {
+    if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
+    liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
+      if (!snap.exists()) { showRevoked('deleted'); return; }
+      const data = snap.data();
+      if (data.status === 'disabled') { showRevoked('disabled'); return; }
+      if (data.expires_at) {
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { showRevoked('expired'); return; }
+        startExpiryTicker(expiry.getTime());
+      }
+    });
+  }
+
+  function stopLiveListener() {
+    if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
+  }
+
+  function showRevoked(reason) {
+    stopLiveListener();
+    if (expiryInterval) clearInterval(expiryInterval);
+    localStorage.removeItem(KEY_ACCESS);
+    localStorage.removeItem(KEY_CODE);
+    localStorage.removeItem(KEY_EMAIL);
+    localStorage.removeItem('gv_tier');
+    document.getElementById('protected-content').style.display = 'none';
+    document.getElementById('accessModal').style.display = 'none';
+    const titles = { disabled: 'Access Paused', deleted: 'Code Not Found', expired: 'Access Expired' };
+    document.getElementById('revokedTitle').innerText = titles[reason] || 'Access Paused';
+    const msgEl = document.getElementById('revokedMsg');
+    if (reason === 'expired') {
+      msgEl.innerHTML = 'Your access has expired. No worries — you can renew your plan anytime to continue downloading games on GameVault.';
+    } else {
+      msgEl.innerText = { disabled: 'Your access has been temporarily disabled.', deleted: 'This access code is no longer available.', expired: 'Your access has expired.' }[reason] || 'Access issue.';
+    }
+    document.getElementById('revokedOverlay').classList.add('show');
+    document.getElementById('userBadge').style.display = 'none';
+    uiReady();
+  }
+
+  function grantAccess(expiresAt, tier) {
+    document.getElementById('accessModal').style.display = 'none';
+    document.getElementById('revokedOverlay').classList.remove('show');
+    document.getElementById('protected-content').style.display = 'block';
+    startExpiryTicker(expiresAt);
+    showTierBadge(tier);
+    startSafeListener();
+    uiReady();
+  }
+
+  function requireCode() {
+    stopLiveListener();
+    if (expiryInterval) clearInterval(expiryInterval);
+    document.getElementById('protected-content').style.display = 'none';
+    document.getElementById('revokedOverlay').classList.remove('show');
+    document.getElementById('accessModal').style.display = 'flex';
+    document.getElementById('userBadge').style.display = 'none';
+    uiReady();
+  }
+
+  async function verifyCode(rawCode, email, silent) {
+    const normalized = rawCode.trim().toUpperCase().replace(/-/g, '');
+    if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
+    const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
+    try {
+      const snap = await getDoc(doc(db, 'codes', codeKey));
+      if (!snap.exists()) { if (!silent) showError('Code not found.'); return { ok: false }; }
+      const data = snap.data();
+      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
+      let expiresAt = null;
+      if (data.expires_at) {
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
+        expiresAt = expiry.getTime();
+      }
+      const sessionId = getSessionId();
+      const usedSessions = data.used_sessions || [];
+      const usedEmails = data.used_emails || [];
+      const maxDevices = data.max_devices || 1;
+      const isLifetime = maxDevices >= 999 || maxDevices === -1;
+
+      let tier = 'elite';
+      if (isLifetime) tier = 'vip';
+      else if (maxDevices <= 1) tier = 'member';
+
+      const normalEmail = email.trim().toLowerCase();
+      if (!isLifetime) {
+        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
+          if (!silent) showError('Please enter a valid email address.');
+          return { ok: false };
+        }
+        if (!usedEmails.includes(normalEmail)) {
+          if (usedEmails.length >= maxDevices) {
+            if (!silent) showError('Email limit reached.');
+            return { ok: false };
+          }
+          usedEmails.push(normalEmail);
+        }
+      }
+
+      if (!usedSessions.includes(sessionId)) {
+        if (!isLifetime && usedSessions.length >= maxDevices) {
+          if (!silent) showError('Device limit reached.');
+          return { ok: false };
+        }
+        usedSessions.push(sessionId);
+      }
+
+      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
+      if (data.status !== 'used') {
+        updateData.status = 'used';
+        updateData.used_at = serverTimestamp();
+      }
+      await updateDoc(doc(db, 'codes', codeKey), updateData);
+
+      _setAccess(codeKey);
+      localStorage.setItem(KEY_CODE, codeKey);
+      localStorage.setItem('gv_tier', tier);
+      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
+      return { ok: true, codeKey, expiresAt, tier };
+    } catch (err) {
+      if (!silent) showError(err.message || 'Verification failed.');
+      return { ok: false };
+    }
+  }
+
+  async function handleSubmit() {
+    const btn = document.getElementById('verifyAccessBtn');
+    const code = document.getElementById('accessCodeInput').value;
+    const email = document.getElementById('accessEmailInput').value.trim();
+    btn.disabled = true; btn.innerText = 'Verifying...'; showError('');
+    const result = await verifyCode(code, email, false);
+    if (result.ok) { grantAccess(result.expiresAt, result.tier); startLiveListener(result.codeKey); }
+    else { btn.disabled = false; btn.innerText = 'UNLOCK GAMEVAULT'; }
+  }
+
+  function esc(s) {
+    if (s === undefined || s === null) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   }
 
   function todayISO() {
@@ -271,7 +551,7 @@
   function tsToISO(ts) {
     if (!ts) return null;
     try {
-      if (typeof ts?.toDate === 'function') return ts.toDate().toISOString().slice(0,10);
+      if (typeof (ts == null ? void 0 : ts.toDate) === 'function') return ts.toDate().toISOString().slice(0,10);
       if (ts instanceof Date) return ts.toISOString().slice(0,10);
       if (typeof ts === 'string') return ts.slice(0,10);
       if (typeof ts === 'number') return new Date(ts).toISOString().slice(0,10);
@@ -281,9 +561,8 @@
 
   function dateLabel(iso) {
     if (!iso) return 'Unknown';
-    try {
-      return new Date(iso).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' });
-    } catch { return iso; }
+    try { return new Date(iso).toLocaleDateString('en-US', { month:'long', day:'numeric', year:'numeric' }); }
+    catch { return iso; }
   }
 
   function relLabel(iso, today) {
@@ -296,11 +575,6 @@
     return null;
   }
 
-  function esc(s) {
-    if (s === undefined || s === null) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
-
   function isValidThumb(url) {
     if (!url || typeof url !== 'string') return false;
     const trimmed = url.trim();
@@ -311,12 +585,12 @@
   function cardHtml(g) {
     const hasThumb = isValidThumb(g.thumb);
     const thumbHtml = hasThumb
-      ? `<img src="${esc(g.thumb)}" alt="${esc(g.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="no-img" style="display:none">🎮</div>`
-      : '<div class="no-img">🎮</div>';
+      ? `<img src="${esc(g.thumb)}" alt="${esc(g.name)}" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="no-img" style="display:none">&#127918;</div>`
+      : '<div class="no-img">&#127918;</div>';
     const dlDisabled = !g.downloadUrl || g.downloadUrl === '#';
     const btnHtml = dlDisabled
       ? '<span class="update-dl-btn" style="opacity:.6;cursor:default;background:var(--color-surface-2)">Coming Soon</span>'
-      : `<a href="${esc(g.downloadUrl)}" target="_blank" rel="noopener" class="update-dl-btn">⬇ DOWNLOAD NOW</a>`;
+      : `<a href="${esc(g.downloadUrl)}" target="_blank" rel="noopener" class="update-dl-btn">&#11015; DOWNLOAD NOW</a>`;
     return `<div class="update-card">
       <div class="update-thumb">${thumbHtml}<div class="update-overlay">${btnHtml}</div></div>
       <div class="update-info">
@@ -329,64 +603,50 @@
   function render(allGames) {
     const container = document.getElementById('updatesContainer');
     const TODAY = todayISO();
-
     if (!allGames || !allGames.length) {
       container.innerHTML = '<div class="empty-state">No games yet.</div>';
       document.getElementById('pageSubtext').textContent = '0 games';
       return;
     }
-
     const seen = new Set();
-    const unique = allGames.filter(g => {
-      const k = g.name?.toLowerCase();
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-
+    const unique = allGames.filter(g => { const k = g.name && g.name.toLowerCase(); if (seen.has(k)) return false; seen.add(k); return true; });
     const CATALOG_KEY = 'catalog';
     const groups = {};
-
     unique.forEach(g => {
       let dateKey = CATALOG_KEY;
       const fromFirestore = g._source === 'firestore';
-      let addedTimestamp = null;
       if (fromFirestore && (g.createdAt || g.created_at)) {
-        addedTimestamp = tsToISO(g.createdAt || g.created_at);
-        if (addedTimestamp) dateKey = addedTimestamp;
+        const ts = tsToISO(g.createdAt || g.created_at);
+        if (ts) dateKey = ts;
       } else if (g.addedDate && /^\d{4}-\d{2}-\d{2}$/.test(g.addedDate)) {
         dateKey = g.addedDate;
       }
       if (!groups[dateKey]) groups[dateKey] = [];
       groups[dateKey].push(g);
     });
-
     const sortedKeys = Object.keys(groups).sort((a,b) => {
       if (a === CATALOG_KEY) return 1;
       if (b === CATALOG_KEY) return -1;
       return a < b ? 1 : -1;
     });
-
     const fsCount = unique.filter(g => g._source === 'firestore').length;
     document.getElementById('pageSubtext').textContent = `${unique.length} games total · ${fsCount} added via dashboard`;
-
     container.innerHTML = sortedKeys.map((dateKey, idx) => {
       const games = groups[dateKey];
       const isCatalog = dateKey === CATALOG_KEY;
       const isToday = dateKey === TODAY;
       const label = isCatalog ? 'Pre-loaded Catalog' : dateLabel(dateKey);
       const rel = isCatalog ? null : relLabel(dateKey, TODAY);
-
       return `<details class="update-group"${idx === 0 ? ' open' : ''} style="animation-delay:${idx*0.045}s">
         <summary>
           <div class="summary-left">
-            <div class="chevron">▾</div>
+            <div class="chevron">&#9662;</div>
             <div class="date-info">
               <div class="date-main">${esc(label)}${rel ? `<span class="date-rel"> (${rel})</span>` : ''}</div>
             </div>
           </div>
           <div class="summary-right">
-            ${isToday ? '<span class="tag-today">● TODAY</span>' : ''}
+            ${isToday ? '<span class="tag-today">&#9679; TODAY</span>' : ''}
             ${isCatalog ? '<span class="tag-count" style="background:var(--color-surface-2);color:var(--color-text-2)">'+games.length+' Games</span>' : '<span class="tag-count">'+games.length+' Update'+(games.length!==1?'s':'')+'</span>'}
           </div>
         </summary>
@@ -395,51 +655,30 @@
     }).join('');
   }
 
-  function waitForCatalog(timeout = 2000) {
+  function waitForCatalog(timeout) {
     return new Promise(resolve => {
-      if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) {
-        resolve(window.GAMES_CATALOG);
-        return;
-      }
+      if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) { resolve(window.GAMES_CATALOG); return; }
       let elapsed = 0;
       const interval = 100;
       const check = setInterval(() => {
         elapsed += interval;
-        if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) {
-          clearInterval(check);
-          resolve(window.GAMES_CATALOG);
-        } else if (elapsed >= timeout) {
-          clearInterval(check);
-          console.warn('GAMES_CATALOG not found after timeout, using empty catalog');
-          resolve([]);
-        }
+        if (window.GAMES_CATALOG && Array.isArray(window.GAMES_CATALOG)) { clearInterval(check); resolve(window.GAMES_CATALOG); }
+        else if (elapsed >= (timeout || 2000)) { clearInterval(check); resolve([]); }
       }, interval);
     });
   }
 
   async function startSafeListener() {
     const rawCatalog = await waitForCatalog(2500);
-    const catalog = (rawCatalog || []).map(g => ({
-      ...g,
-      id: String(g.id || ''),
-      _source: 'catalog',
-      status: g.status || 'active',
-      downloads: g.downloads || 0,
-      name: g.name || 'Unknown'
-    }));
-
-    // Show catalog immediately
+    const catalog = (rawCatalog || []).map(g => ({ ...g, id: String(g.id || ''), _source: 'catalog', status: g.status || 'active', downloads: g.downloads || 0, name: g.name || 'Unknown' }));
     render(catalog);
-
     if (!db) return;
-
     try {
       onSnapshot(collection(db, 'games'),
         (snap) => {
-          const fsGames = snap.docs.map(d => ({ ...d.data(), id: d.id, _source: 'firestore' }))
-            .filter(g => g.status !== 'hidden');
-          const fsNames = new Set(fsGames.map(g => g.name?.toLowerCase()));
-          const catalogOnly = catalog.filter(g => !fsNames.has(g.name?.toLowerCase()));
+          const fsGames = snap.docs.map(d => ({ ...d.data(), id: d.id, _source: 'firestore' })).filter(g => g.status !== 'hidden');
+          const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
+          const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
           render([...fsGames, ...catalogOnly]);
         },
         () => {}
@@ -447,76 +686,76 @@
     } catch (_) {}
   }
 
-  startSafeListener();
+  window.addEventListener('DOMContentLoaded', async () => {
+    document.getElementById('accessCodeInput').addEventListener('input', e => {
+      let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+      if (val.length > 4) val = val.substring(0,4)+'-'+val.substring(4);
+      if (val.length > 9) val = val.substring(0,9)+'-'+val.substring(9);
+      e.target.value = val.substring(0,14);
+    });
+    document.getElementById('verifyAccessBtn').addEventListener('click', handleSubmit);
+    document.getElementById('accessCodeInput').addEventListener('keydown', e => { if (e.key === 'Enter') handleSubmit(); });
+
+    const savedCode = localStorage.getItem(KEY_CODE);
+    const savedEmail = localStorage.getItem(KEY_EMAIL) || '';
+    const savedTier = localStorage.getItem('gv_tier') || 'member';
+    if (savedCode && _isAccess(savedCode)) {
+      const result = await verifyCode(savedCode, savedEmail, true);
+      if (result.ok) { grantAccess(result.expiresAt, result.tier || savedTier); startLiveListener(result.codeKey); }
+      else requireCode();
+    } else {
+      localStorage.removeItem(KEY_ACCESS);
+      localStorage.removeItem(KEY_CODE);
+      requireCode();
+    }
+
+    const hamburger = document.getElementById('nav-hamburger');
+    const mobileNav = document.getElementById('nav-mobile');
+    if (hamburger && mobileNav) {
+      hamburger.addEventListener('click', () => { hamburger.classList.toggle('active'); mobileNav.classList.toggle('open'); });
+      mobileNav.querySelectorAll('.navbar__mobile-link').forEach(link => { link.addEventListener('click', () => { hamburger.classList.remove('active'); mobileNav.classList.remove('open'); }); });
+    }
+  });
 </script>
 
-</div>
-
 <script>
+(function() {
+  var k = function(e) {
+    if (e.target == 0 || e.keyCode == 123 || (e.ctrlKey && e.shiftKey && (e.keyCode == 73 || e.keyCode == 74 || e.keyCode == 67)) || (e.ctrlKey && e.keyCode == 85)) { e.preventDefault(); return false; }
+  };
+  document.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+  document.addEventListener('keydown', k);
+})();
+
 function initBg() {
-  const canvas = document.getElementById('bgCanvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  let w, h, animId;
-  const particles = [];
-  const PARTICLE_COUNT = 35;
-  const CONNECT_DIST = 100;
-  const isMobile = window.innerWidth < 768;
-
-  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  var c = document.getElementById('bgCanvas');
+  if (!c) return;
+  var ctx = c.getContext('2d');
+  var w, h, animId;
+  var particles = [];
+  var PARTICLE_COUNT = 35, CONNECT_DIST = 100;
+  var isMobile = window.innerWidth < 768;
+  function resize() { w = c.width = window.innerWidth; h = c.height = window.innerHeight; }
   window.addEventListener('resize', resize); resize();
-
-  for (let i = 0; i < PARTICLE_COUNT; i++) particles.push({
-    x: Math.random() * w, y: Math.random() * h,
-    vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
-    r: 1 + Math.random()
-  });
-
-  let skip = 0;
+  for (var i = 0; i < PARTICLE_COUNT; i++) particles.push({ x: Math.random() * w, y: Math.random() * h, vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3, r: 1 + Math.random() });
+  var skip = 0;
   function draw() {
     animId = requestAnimationFrame(draw);
     skip++; if (skip % 3) return;
     ctx.clearRect(0, 0, w, h);
-    for (let i = 0; i < particles.length; i++) {
-      const p = particles[i]; p.x += p.vx; p.y += p.vy;
-      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
-      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
-      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(45,212,191,0.18)'; ctx.fill();
-    }
-    if (!isMobile) {
-      for (let i = 0; i < particles.length; i++) for (let j = i + 1; j < particles.length; j++) {
-        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
-        if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < CONNECT_DIST) {
-          ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y);
-          ctx.lineTo(particles[j].x, particles[j].y);
-          ctx.strokeStyle = `rgba(45,212,191,${0.04 * (1 - dist / CONNECT_DIST)})`;
-          ctx.lineWidth = 0.5; ctx.stroke();
-        }
-      }
-    }
+    for (var i = 0; i < particles.length; i++) { var p = particles[i]; p.x += p.vx; p.y += p.vy; if (p.x < 0) p.x = w; if (p.x > w) p.x = 0; if (p.y < 0) p.y = h; if (p.y > h) p.y = 0; ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fillStyle = 'rgba(45,212,191,0.18)'; ctx.fill(); }
+    if (!isMobile) { for (var i = 0; i < particles.length; i++) { for (var j = i + 1; j < particles.length; j++) { var dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y; if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue; var dist = Math.sqrt(dx * dx + dy * dy); if (dist < CONNECT_DIST) { ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y); ctx.lineTo(particles[j].x, particles[j].y); ctx.strokeStyle = 'rgba(45,212,191,' + (0.04 * (1 - dist / CONNECT_DIST)) + ')'; ctx.lineWidth = 0.5; ctx.stroke(); } } } }
   }
-  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(animId); else draw(); });
+  document.addEventListener('visibilitychange', function() { if (document.hidden) cancelAnimationFrame(animId); else draw(); });
   draw();
 }
 initBg();
 
-// Hamburger menu toggle
-const hamburger = document.getElementById('nav-hamburger');
-const mobileNav = document.getElementById('nav-mobile');
+var hamburger = document.getElementById('nav-hamburger');
+var mobileNav = document.getElementById('nav-mobile');
 if (hamburger && mobileNav) {
-  hamburger.addEventListener('click', () => {
-    hamburger.classList.toggle('active');
-    mobileNav.classList.toggle('open');
-  });
-  mobileNav.querySelectorAll('.navbar__mobile-link').forEach(link => {
-    link.addEventListener('click', () => {
-      hamburger.classList.remove('active');
-      mobileNav.classList.remove('open');
-    });
-  });
+  hamburger.addEventListener('click', function() { hamburger.classList.toggle('active'); mobileNav.classList.toggle('open'); });
+  mobileNav.querySelectorAll('.navbar__mobile-link').forEach(function(link) { link.addEventListener('click', function() { hamburger.classList.remove('active'); mobileNav.classList.remove('open'); }); });
 }
 </script>
 
