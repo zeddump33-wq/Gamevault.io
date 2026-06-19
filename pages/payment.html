@@ -739,11 +739,13 @@
     const btn = document.getElementById('submitOrderBtn');
     btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting...';
     try {
-      const dupSnap = await getDocs(query(collection(db, 'orders'), where('gcashRef', '==', ref)));
-      if (!dupSnap.empty) {
-        showErr('refErr', 'Reference already used. Contact support.');
-        btn.disabled = false; btn.innerHTML = 'SUBMIT & VERIFY →'; return;
-      }
+      try {
+        const dupSnap = await getDocs(query(collection(db, 'orders'), where('gcashRef', '==', ref)));
+        if (!dupSnap.empty) {
+          showErr('refErr', 'Reference already used. Contact support.');
+          btn.disabled = false; btn.innerHTML = 'SUBMIT & VERIFY →'; return;
+        }
+      } catch (_) {}
       const { price, devices, days } = PLAN_CATALOG[selectedPlanKey];
       orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
       await setDoc(doc(db, 'orders', orderId), {
