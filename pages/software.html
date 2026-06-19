@@ -656,13 +656,6 @@ function initBg() {
   draw();
 }
 initBg();
-
-var hamburger = document.getElementById('nav-hamburger');
-var mobileNav = document.getElementById('nav-mobile');
-if (hamburger && mobileNav) {
-  hamburger.addEventListener('click', function() { hamburger.classList.toggle('active'); mobileNav.classList.toggle('open'); });
-  mobileNav.querySelectorAll('.navbar__mobile-link').forEach(function(link) { link.addEventListener('click', function() { hamburger.classList.remove('active'); mobileNav.classList.remove('open'); }); });
-}
 </script>
 
 </body>
