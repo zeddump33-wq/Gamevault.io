@@ -318,7 +318,7 @@
 
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, doc, collection, getDoc, getDocs, updateDoc, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getFirestore, collection, getDocs, query, orderBy, getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -401,15 +401,14 @@
 
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    if (!codeKey) return;
     liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
-      if (!snap.exists) { showRevoked('deleted'); return; }
+      if (!snap.exists()) { showRevoked('deleted'); return; }
       const data = snap.data();
       if (data.status === 'disabled') { showRevoked('disabled'); return; }
       if (data.expires_at) {
-        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
-        if (Date.now() > expiresAt) { showRevoked('expired'); return; }
-        startExpiryTicker(expiresAt);
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { showRevoked('expired'); return; }
+        startExpiryTicker(expiry.getTime());
       }
     });
   }
@@ -465,51 +464,62 @@
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
       const snap = await getDoc(doc(db, 'codes', codeKey));
-      if (!snap.exists()) {
-        if (!silent) showError('Code not found.');
-        return { ok: false };
-      }
+      if (!snap.exists()) { if (!silent) showError('Code not found.'); return { ok: false }; }
       const data = snap.data();
-      if (data.status === 'disabled') {
-        if (!silent) showError('This code has been disabled.');
-        return { ok: false };
-      }
+      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
+      let expiresAt = null;
       if (data.expires_at) {
-        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
-        if (Date.now() > expiresAt) {
-          if (!silent) showError('Code has expired.');
-          return { ok: false };
-        }
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
+        expiresAt = expiry.getTime();
       }
-      const usedSessions = data.used_sessions || [];
       const sessionId = getSessionId();
-      const emailLower = (email || '').trim().toLowerCase();
-      if (data.max_devices && data.max_devices > 0 && usedSessions.length >= data.max_devices) {
-        if (!usedSessions.includes(sessionId) && !(data.used_emails || []).includes(emailLower)) {
-          if (!silent) showError('Max devices reached.');
+      const usedSessions = data.used_sessions || [];
+      const usedEmails = data.used_emails || [];
+      const maxDevices = data.max_devices || 1;
+      const isLifetime = maxDevices >= 999 || maxDevices === -1;
+
+      let tier = 'elite';
+      if (isLifetime) tier = 'vip';
+      else if (maxDevices <= 1) tier = 'member';
+
+      const normalEmail = email.trim().toLowerCase();
+      if (!isLifetime) {
+        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
+          if (!silent) showError('Please enter a valid email address.');
           return { ok: false };
         }
+        if (!usedEmails.includes(normalEmail)) {
+          if (usedEmails.length >= maxDevices) {
+            if (!silent) showError('Email limit reached.');
+            return { ok: false };
+          }
+          usedEmails.push(normalEmail);
+        }
       }
-      const updates = {};
+
       if (!usedSessions.includes(sessionId)) {
-        updates.used_sessions = arrayUnion(sessionId);
+        if (!isLifetime && usedSessions.length >= maxDevices) {
+          if (!silent) showError('Device limit reached.');
+          return { ok: false };
+        }
+        usedSessions.push(sessionId);
       }
-      if (email && !(data.used_emails || []).includes(emailLower)) {
-        updates.used_emails = arrayUnion(emailLower);
+
+      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
+      if (data.status !== 'used') {
+        updateData.status = 'used';
+        updateData.used_at = serverTimestamp();
       }
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(doc(db, 'codes', codeKey), updates);
-      }
+      await updateDoc(doc(db, 'codes', codeKey), updateData);
+
       _setAccess(codeKey);
       localStorage.setItem(KEY_CODE, codeKey);
-      localStorage.setItem('gv_tier', data.tier || 'member');
-      if (email) localStorage.setItem(KEY_EMAIL, emailLower);
-      const expiresAt = data.expires_at
-        ? (data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000)
-        : null;
-      return { ok: true, codeKey, expiresAt, tier: data.tier || 'member' };
+      localStorage.setItem('gv_tier', tier);
+      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
+      return { ok: true, codeKey, expiresAt, tier };
     } catch (err) {
-      if (!silent) showError('Verification failed. Please try again.');
+      if (!silent) showError(err.message || 'Verification failed.');
       return { ok: false };
     }
   }
@@ -545,7 +555,7 @@
   async function loadSoftware() {
     const container = document.getElementById('swBody');
     try {
-      const snap = await getDocs(collection(db, 'software'));
+      const snap = await getDocs(query(collection(db, 'software'), orderBy('name')));
       const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (!items.length) {
         container.innerHTML = '<div class="sw-note" style="text-align:center;padding:40px;">No software available yet. Check back later.</div>';
@@ -566,32 +576,17 @@
             ? `<img class="sw-card-thumb" src="${escapeHtml(sw.thumb)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sw-card-icon" style="display:none">${icon}</div>`
             : `<div class="sw-card-icon">${icon}</div>`;
           html += `
-            <div class="sw-card" data-sw-id="${escapeHtml(sw.id)}">
+            <div class="sw-card">
               ${thumbHtml}
               <h3>${escapeHtml(sw.name)}</h3>
               <span class="tag">${escapeHtml(cat)}</span>
               <p>${escapeHtml(sw.desc || '')}</p>
-              <button class="sw-dl-btn" data-sw-id="${escapeHtml(sw.id)}">⬇ Download</button>
+              <a class="sw-dl-btn" href="${escapeHtml(sw.downloadUrl || '#')}" target="_blank" rel="noopener">⬇ Download</a>
             </div>`;
         }
         html += '</div>';
       }
       container.innerHTML = html;
-      container.querySelectorAll('.sw-dl-btn').forEach(btn => {
-        btn.addEventListener('click', async e => {
-          const id = btn.dataset.swId;
-          try {
-            const swDoc = await getDoc(doc(db, 'software', id));
-            if (swDoc.exists() && swDoc.data().downloadUrl) {
-              window.open(swDoc.data().downloadUrl, '_blank', 'noopener');
-            } else {
-              showToast('Access denied', 2000);
-            }
-          } catch {
-            showToast('Access denied', 2000);
-          }
-        });
-      });
     } catch (err) {
       container.innerHTML = '<div class="sw-note" style="text-align:center;padding:40px;color:var(--color-danger);">Failed to load software. Please try again later.</div>';
     }
