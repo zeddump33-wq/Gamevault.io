@@ -952,7 +952,7 @@
 
       </ul>
       <div class="navbar__actions">
-        <span class="notif-btn-wrap">
+        <span class="notif-btn-wrap" id="notifBellWrap" style="display:none;">
           <button class="notif-btn" id="notifBell" aria-label="VIP Notifications">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
             <span class="notif-dot" id="notifDot"></span>
@@ -1749,6 +1749,16 @@
     vip:    { label: 'VIP', bg: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff' }
   };
 
+  function updateVipFeatures(tier) {
+    const isVip = tier === 'vip';
+    const bellWrap = document.getElementById('notifBellWrap');
+    if (bellWrap) bellWrap.style.display = isVip ? '' : 'none';
+    const chatBox = document.getElementById('gvChatBox');
+    const chatBtn = document.getElementById('gvChatBtn');
+    if (chatBox) chatBox.style.display = isVip ? '' : 'none';
+    if (chatBtn) chatBtn.style.display = isVip ? '' : 'none';
+  }
+
   function showTierBadge(tier) {
     const el = document.getElementById('userBadge');
     const cfg = TIER_STYLES[tier] || TIER_STYLES.elite;
@@ -1756,7 +1766,7 @@
     el.style.background = cfg.bg;
     el.style.color = cfg.color;
     el.style.display = 'inline-block';
-
+    updateVipFeatures(tier);
   }
 
   function requireCode() {
@@ -1766,6 +1776,7 @@
     document.getElementById('revokedOverlay').classList.remove('show');
     document.getElementById('accessModal').style.display = 'flex';
     document.getElementById('userBadge').style.display = 'none';
+    updateVipFeatures('');
     onVerificationComplete();
   }
 
@@ -1789,6 +1800,7 @@
     }
     document.getElementById('revokedOverlay').classList.add('show');
     document.getElementById('userBadge').style.display = 'none';
+    updateVipFeatures('');
     onVerificationComplete();
   }
 
@@ -2268,8 +2280,6 @@
 <script>
 (function () {
 
-  var isVIP = (localStorage.getItem("gv_tier") || "").toLowerCase() === "vip";
-  if (!isVIP) return;
   if (window.__GV_CHAT_LOADED__) return;
   window.__GV_CHAT_LOADED__ = true;
 
@@ -2277,7 +2287,7 @@
   var root = document.getElementById("gamevault-chat-root");
 
   root.innerHTML = `
-    <div id="gvChatBox">
+    <div id="gvChatBox" style="display:none;">
       <div class="gv-header">
         <div class="gv-header-avatar"><img src="images/icon2.png" alt="Bot"></div>
         <div class="gv-header-info">
@@ -2298,7 +2308,7 @@
         </button>
       </div>
     </div>
-    <button id="gvChatBtn" aria-label="Open GameVault chat">
+    <button id="gvChatBtn" style="display:none;" aria-label="Open GameVault chat">
       <img src="images/icon2.png" alt="Chat">
     </button>
   `;
