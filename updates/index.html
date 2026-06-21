@@ -318,7 +318,10 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import { getFirestore, doc, collection, getDoc, getDocs, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+  import {
+    getFirestore, doc, getDoc, onSnapshot, updateDoc, serverTimestamp,
+    collection, increment
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -363,12 +366,20 @@
   async function getSecureDownloadUrl(gameId) {
     if (_urlCache.has(gameId)) return _urlCache.get(gameId);
     try {
-      const docSnap = await getDoc(doc(db, 'games', gameId));
-      if (!docSnap.exists()) throw new Error('Not found');
-      const url = docSnap.data().downloadUrl;
-      if (!url) throw new Error('No URL');
-      _urlCache.set(gameId, url);
-      return url;
+      const snap = await getDoc(doc(db, 'games', gameId));
+      if (!snap.exists()) throw new Error('Game not found');
+      const data = snap.data();
+      const userTier = getTierFilter();
+      const membership = data.membership || 'All';
+      if (tierAllows(userTier, membership) &&
+          !(userTier === 'member' && data.releaseStatus && data.releaseStatus !== 'Full Release' &&
+            membership !== 'All')) {
+        if (data.downloadUrl && data.downloadUrl !== '#') {
+          _urlCache.set(gameId, data.downloadUrl);
+          return data.downloadUrl;
+        }
+      }
+      throw new Error('Access denied');
     } catch (err) {
       throw new Error('Access denied');
     }
@@ -438,15 +449,14 @@
 
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    if (!codeKey) return;
     liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
-      if (!snap.exists) { showRevoked('deleted'); return; }
+      if (!snap.exists()) { showRevoked('deleted'); return; }
       const data = snap.data();
       if (data.status === 'disabled') { showRevoked('disabled'); return; }
       if (data.expires_at) {
-        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
-        if (Date.now() > expiresAt) { showRevoked('expired'); return; }
-        startExpiryTicker(expiresAt);
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { showRevoked('expired'); return; }
+        startExpiryTicker(expiry.getTime());
       }
     });
   }
@@ -503,51 +513,62 @@
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
       const snap = await getDoc(doc(db, 'codes', codeKey));
-      if (!snap.exists()) {
-        if (!silent) showError('Code not found.');
-        return { ok: false };
-      }
+      if (!snap.exists()) { if (!silent) showError('Code not found.'); return { ok: false }; }
       const data = snap.data();
-      if (data.status === 'disabled') {
-        if (!silent) showError('This code has been disabled.');
-        return { ok: false };
-      }
+      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
+      let expiresAt = null;
       if (data.expires_at) {
-        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
-        if (Date.now() > expiresAt) {
-          if (!silent) showError('Code has expired.');
-          return { ok: false };
-        }
+        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
+        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
+        expiresAt = expiry.getTime();
       }
-      const usedSessions = data.used_sessions || [];
       const sessionId = getSessionId();
-      const emailLower = (email || '').trim().toLowerCase();
-      if (data.max_devices && data.max_devices > 0 && usedSessions.length >= data.max_devices) {
-        if (!usedSessions.includes(sessionId) && !(data.used_emails || []).includes(emailLower)) {
-          if (!silent) showError('Max devices reached.');
+      const usedSessions = data.used_sessions || [];
+      const usedEmails = data.used_emails || [];
+      const maxDevices = data.max_devices || 1;
+      const isLifetime = maxDevices >= 999 || maxDevices === -1;
+
+      let tier = 'elite';
+      if (isLifetime) tier = 'vip';
+      else if (maxDevices <= 1) tier = 'member';
+
+      const normalEmail = email.trim().toLowerCase();
+      if (!isLifetime) {
+        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
+          if (!silent) showError('Please enter a valid email address.');
           return { ok: false };
         }
+        if (!usedEmails.includes(normalEmail)) {
+          if (usedEmails.length >= maxDevices) {
+            if (!silent) showError('Email limit reached.');
+            return { ok: false };
+          }
+          usedEmails.push(normalEmail);
+        }
       }
-      const updates = {};
+
       if (!usedSessions.includes(sessionId)) {
-        updates.used_sessions = arrayUnion(sessionId);
+        if (!isLifetime && usedSessions.length >= maxDevices) {
+          if (!silent) showError('Device limit reached.');
+          return { ok: false };
+        }
+        usedSessions.push(sessionId);
       }
-      if (email && !(data.used_emails || []).includes(emailLower)) {
-        updates.used_emails = arrayUnion(emailLower);
+
+      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
+      if (data.status !== 'used') {
+        updateData.status = 'used';
+        updateData.used_at = serverTimestamp();
       }
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(doc(db, 'codes', codeKey), updates);
-      }
+      await updateDoc(doc(db, 'codes', codeKey), updateData);
+
       _setAccess(codeKey);
       localStorage.setItem(KEY_CODE, codeKey);
-      localStorage.setItem('gv_tier', data.tier || 'member');
-      if (email) localStorage.setItem(KEY_EMAIL, emailLower);
-      const expiresAt = data.expires_at
-        ? (data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000)
-        : null;
-      return { ok: true, codeKey, expiresAt, tier: data.tier || 'member' };
+      localStorage.setItem('gv_tier', tier);
+      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
+      return { ok: true, codeKey, expiresAt, tier };
     } catch (err) {
-      if (!silent) showError('Verification failed. Please try again.');
+      if (!silent) showError(err.message || 'Verification failed.');
       return { ok: false };
     }
   }
@@ -715,20 +736,24 @@
           g.membership && g.membership !== 'All') return false;
       return true;
     }));
-    // Fetch Firestore games directly
+    if (!db) return;
     try {
-      const snap = await getDocs(collection(db, 'games'));
-      const fsGames = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(g => g.status !== 'hidden');
-      const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
-      const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
-      const allGames = [...fsGames, ...catalogOnly];
-      const ft = getTierFilter();
-      render(allGames.filter(g => {
-        if (!tierAllows(ft, g.membership)) return false;
-        if (ft === 'member' && g.releaseStatus && g.releaseStatus !== 'Full Release' &&
-            g.membership && g.membership !== 'All') return false;
-        return true;
-      }));
+      onSnapshot(collection(db, 'games'),
+        (snap) => {
+          const fsGames = snap.docs.map(d => ({ ...d.data(), id: d.id, _source: 'firestore' })).filter(g => g.status !== 'hidden');
+          const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
+          const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
+          const allGames = [...fsGames, ...catalogOnly];
+          const ft = getTierFilter();
+          render(allGames.filter(g => {
+            if (!tierAllows(ft, g.membership)) return false;
+            if (ft === 'member' && g.releaseStatus && g.releaseStatus !== 'Full Release' &&
+                g.membership && g.membership !== 'All') return false;
+            return true;
+          }));
+        },
+        () => {}
+      );
     } catch (_) {}
   }
 
