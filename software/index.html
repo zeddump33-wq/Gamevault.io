@@ -318,7 +318,9 @@
 
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, collection, getDocs, query, orderBy, getDoc, doc, updateDoc, serverTimestamp, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import {
+    getFunctions, httpsCallable
+  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -330,7 +332,11 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const functions_ = getFunctions(app);
+  const verifyCodeFn = httpsCallable(functions_, 'verifyAccessCode');
+  const getSoftwareListFn = httpsCallable(functions_, 'getSoftwareList');
+  const getSoftwareDownloadUrlFn = httpsCallable(functions_, 'getSoftwareDownloadUrl');
+  const checkCodeStatusFn = httpsCallable(functions_, 'checkCodeStatus');
 
   const KEY_ACCESS = 'gv_access';
   const KEY_CODE = 'gv_code';
@@ -399,22 +405,28 @@
     expiryInterval = setInterval(update, 1000);
   }
 
+  let statusPollInterval = null;
+
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
-      if (!snap.exists()) { showRevoked('deleted'); return; }
-      const data = snap.data();
-      if (data.status === 'disabled') { showRevoked('disabled'); return; }
-      if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { showRevoked('expired'); return; }
-        startExpiryTicker(expiry.getTime());
-      }
-    });
+    if (!codeKey) return;
+    async function poll() {
+      try {
+        const res = await checkCodeStatusFn({ codeKey });
+        const s = res.data;
+        if (!s.exists) { showRevoked('deleted'); return; }
+        if (s.status === 'disabled') { showRevoked('disabled'); return; }
+        if (s.status === 'expired') { showRevoked('expired'); return; }
+        if (s.expiresAt) startExpiryTicker(s.expiresAt);
+      } catch {}
+    }
+    poll();
+    statusPollInterval = setInterval(poll, 30000);
   }
 
   function stopLiveListener() {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
+    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
   }
 
   function showRevoked(reason) {
@@ -463,63 +475,19 @@
     if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
-      const snap = await getDoc(doc(db, 'codes', codeKey));
-      if (!snap.exists()) { if (!silent) showError('Code not found.'); return { ok: false }; }
-      const data = snap.data();
-      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
-      let expiresAt = null;
-      if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
-        expiresAt = expiry.getTime();
+      const res = await verifyCodeFn({ code: codeKey, email, sessionId: getSessionId() });
+      const result = res.data;
+      if (!result.ok) {
+        if (!silent) showError(result.error || 'Verification failed.');
+        return { ok: false };
       }
-      const sessionId = getSessionId();
-      const usedSessions = data.used_sessions || [];
-      const usedEmails = data.used_emails || [];
-      const maxDevices = data.max_devices || 1;
-      const isLifetime = maxDevices >= 999 || maxDevices === -1;
-
-      let tier = 'elite';
-      if (isLifetime) tier = 'vip';
-      else if (maxDevices <= 1) tier = 'member';
-
-      const normalEmail = email.trim().toLowerCase();
-      if (!isLifetime) {
-        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
-          if (!silent) showError('Please enter a valid email address.');
-          return { ok: false };
-        }
-        if (!usedEmails.includes(normalEmail)) {
-          if (usedEmails.length >= maxDevices) {
-            if (!silent) showError('Email limit reached.');
-            return { ok: false };
-          }
-          usedEmails.push(normalEmail);
-        }
-      }
-
-      if (!usedSessions.includes(sessionId)) {
-        if (!isLifetime && usedSessions.length >= maxDevices) {
-          if (!silent) showError('Device limit reached.');
-          return { ok: false };
-        }
-        usedSessions.push(sessionId);
-      }
-
-      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
-      if (data.status !== 'used') {
-        updateData.status = 'used';
-        updateData.used_at = serverTimestamp();
-      }
-      await updateDoc(doc(db, 'codes', codeKey), updateData);
-
-      _setAccess(codeKey);
-      localStorage.setItem(KEY_CODE, codeKey);
-      localStorage.setItem('gv_tier', tier);
-      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
-      return { ok: true, codeKey, expiresAt, tier };
+      _setAccess(result.codeKey);
+      localStorage.setItem(KEY_CODE, result.codeKey);
+      localStorage.setItem('gv_tier', result.tier);
+      if (email) localStorage.setItem(KEY_EMAIL, email.trim().toLowerCase());
+      return { ok: true, codeKey: result.codeKey, expiresAt: result.expiresAt, tier: result.tier };
     } catch (err) {
-      if (!silent) showError(err.message || 'Verification failed.');
+      if (!silent) showError('Verification failed. Please try again.');
       return { ok: false };
     }
   }
@@ -555,12 +523,13 @@
   async function loadSoftware() {
     const container = document.getElementById('swBody');
     try {
-      const snap = await getDocs(query(collection(db, 'software'), orderBy('name')));
-      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      const res = await getSoftwareListFn();
+      const items = res.data?.software || [];
       if (!items.length) {
         container.innerHTML = '<div class="sw-note" style="text-align:center;padding:40px;">No software available yet. Check back later.</div>';
         return;
       }
+      const codeKey = localStorage.getItem(KEY_CODE);
       const groups = {};
       for (const item of items) {
         const cat = item.category || 'Other';
@@ -576,17 +545,32 @@
             ? `<img class="sw-card-thumb" src="${escapeHtml(sw.thumb)}" alt="" loading="lazy" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'"><div class="sw-card-icon" style="display:none">${icon}</div>`
             : `<div class="sw-card-icon">${icon}</div>`;
           html += `
-            <div class="sw-card">
+            <div class="sw-card" data-sw-id="${escapeHtml(sw.id)}">
               ${thumbHtml}
               <h3>${escapeHtml(sw.name)}</h3>
               <span class="tag">${escapeHtml(cat)}</span>
               <p>${escapeHtml(sw.desc || '')}</p>
-              <a class="sw-dl-btn" href="${escapeHtml(sw.downloadUrl || '#')}" target="_blank" rel="noopener">⬇ Download</a>
+              <button class="sw-dl-btn" data-sw-id="${escapeHtml(sw.id)}">⬇ Download</button>
             </div>`;
         }
         html += '</div>';
       }
       container.innerHTML = html;
+      container.querySelectorAll('.sw-dl-btn').forEach(btn => {
+        btn.addEventListener('click', async e => {
+          const id = btn.dataset.swId;
+          try {
+            const res = await getSoftwareDownloadUrlFn({ swId: id, codeKey });
+            if (res.data?.ok && res.data?.downloadUrl) {
+              window.open(res.data.downloadUrl, '_blank', 'noopener');
+            } else {
+              showToast('Access denied', 2000);
+            }
+          } catch {
+            showToast('Access denied', 2000);
+          }
+        });
+      });
     } catch (err) {
       container.innerHTML = '<div class="sw-note" style="text-align:center;padding:40px;color:var(--color-danger);">Failed to load software. Please try again later.</div>';
     }
