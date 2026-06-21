@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GameVault — VIP Notifications</title>
+  <link rel="icon" type="image/png" href="../images/Logo.jpg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    .vip-hero {
+      background: var(--color-surface);
+      border-bottom: 1px solid var(--color-border);
+      padding: var(--space-10) var(--space-6);
+      position: relative;
+    }
+    .vip-hero::after {
+      content: ''; position: absolute; right: -60px; top: -60px;
+      width: 300px; height: 300px;
+      background: radial-gradient(circle, rgba(139,92,246,0.06) 0%, transparent 65%);
+      pointer-events: none;
+    }
+    .vip-eyebrow {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase;
+      color: var(--color-purple); display: flex; align-items: center; gap: 8px; margin-bottom: 12px;
+    }
+    .vip-eyebrow::before {
+      content: ''; width: 18px; height: 2px; background: var(--color-purple); border-radius: 99px;
+    }
+    .vip-hero h1 { font-family: var(--font-display); font-size: clamp(22px, 3vw, 34px); font-weight: 900; letter-spacing: -0.5px; margin-bottom: 6px; }
+    .vip-hero p { color: var(--color-text-2); font-size: var(--text-sm); }
+    .vip-main { max-width: 860px; margin: 0 auto; padding: 28px var(--space-6) 80px; }
+    .vip-card {
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: var(--radius-lg);
+      padding: 20px 22px;
+      margin-bottom: 12px;
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+      transition: var(--transition);
+      animation: fadeInUp .28s ease both;
+      position: relative;
+    }
+    .vip-card:hover { border-color: var(--color-border-2); }
+    .vip-card.unread {
+      background: rgba(139,92,246,0.03);
+      border-color: rgba(139,92,246,0.15);
+    }
+    .vip-card.unread::before {
+      content: ''; position: absolute; top: 0; left: 0; bottom: 0; width: 3px;
+      background: var(--color-purple);
+      border-radius: 3px 0 0 3px;
+    }
+    .vip-card-indicator {
+      width: 36px; height: 36px; border-radius: var(--radius); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      background: var(--color-surface-2);
+    }
+    .vip-card-indicator .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--color-text-2);
+    }
+    .vip-card-indicator .dot.release { background: var(--color-text-2); }
+    .vip-card-indicator .dot.beta { background: var(--color-purple); }
+    .vip-card-indicator .dot.demo { background: var(--color-primary); }
+    .vip-card-body { flex: 1; min-width: 0; }
+    .vip-card-meta { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; margin-bottom: 6px; }
+    .vip-status-badge {
+      font-size: 9px; font-weight: 800; letter-spacing: 1px; text-transform: uppercase;
+      padding: 2px 8px; border-radius: 20px;
+      background: var(--color-surface-2); color: var(--color-text-2);
+    }
+    .vip-status-badge.beta { background: rgba(139,92,246,0.12); color: var(--color-purple); }
+    .vip-status-badge.demo { background: rgba(59,130,246,0.12); color: var(--color-primary); }
+    .vip-unread-tag {
+      display: inline-block; font-size: 8px; font-weight: 900; letter-spacing: 0.5px;
+      color: #fff; background: var(--color-purple);
+      padding: 1px 5px; border-radius: 3px;
+    }
+    .vip-card-title {
+      font-size: 15px; font-weight: 800; margin-bottom: 5px; line-height: 1.3;
+      font-family: var(--font-display); color: var(--color-text);
+    }
+    .vip-card-message {
+      font-size: 13px; color: var(--color-text-2); line-height: 1.65;
+    }
+    .vip-card-time {
+      font-size: 11px; color: var(--color-muted); margin-top: 6px;
+    }
+    .vip-empty {
+      text-align: center; padding: 80px 20px;
+    }
+    .vip-empty-icon {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: var(--color-surface-2); margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vip-empty-icon .dot {
+      width: 10px; height: 10px; border-radius: 50%;
+      background: var(--color-text-2); opacity: 0.4;
+    }
+    .vip-empty h3 { font-size: 18px; font-weight: 700; margin-bottom: 6px; }
+    .vip-empty p { color: var(--color-muted); font-size: var(--text-sm); }
+    .vip-access-denied {
+      text-align: center; padding: 100px 20px;
+    }
+    .vip-access-denied-icon {
+      width: 48px; height: 48px; border-radius: 50%;
+      background: rgba(239,68,68,0.08); margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vip-access-denied-icon .lock {
+      width: 12px; height: 12px; border: 2px solid var(--color-danger); border-radius: 2px;
+      border-top: none; position: relative; opacity: 0.5;
+    }
+    .vip-access-denied-icon .lock::before {
+      content: ''; position: absolute; top: -7px; left: 2px;
+      width: 4px; height: 6px; border: 2px solid var(--color-danger); border-radius: 6px 6px 0 0;
+      border-bottom: none;
+    }
+    .vip-access-denied h2 { font-size: 22px; margin-bottom: 10px; }
+    .vip-access-denied p { color: var(--color-muted); margin-bottom: 20px; }
+    .vip-access-denied .btn-home {
+      display: inline-block; padding: 10px 24px;
+      background: var(--color-primary); color: #fff; border-radius: var(--radius);
+      text-decoration: none; font-weight: 600; font-size: 13px;
+    }
+    .vip-error-icon {
+      width: 44px; height: 44px; border-radius: 50%;
+      background: rgba(239,68,68,0.08); margin: 0 auto 16px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .vip-error-icon .exclaim {
+      font-size: 20px; font-weight: 700; color: var(--color-danger); opacity: 0.6;
+    }
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media (max-width: 768px) {
+      .vip-card { flex-direction: column; gap: 10px; padding: 16px; }
+      .vip-main { padding: 20px 16px 60px; }
+      .vip-hero { padding: 28px 16px; }
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="bg-overlay"></div>
+<div class="grid-overlay"></div>
+<div class="content-wrap">
+
+<header class="navbar" role="navigation" aria-label="Main navigation">
+  <div class="navbar__inner">
+    <a href=".." class="navbar__logo">
+      <img src="../images/icon.png" alt="GameVault" style="height:120px;width:auto;">
+    </a>
+    <ul class="navbar__links">
+      <li><a href=".." class="navbar__link">Home</a></li>
+      <li><a href="../ann/" class="navbar__link">News</a></li>
+      <li><a href="../faq/" class="navbar__link">Support</a></li>
+    </ul>
+    <div class="navbar__actions">
+      <button class="navbar__hamburger" id="nav-hamburger" aria-label="Toggle menu">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+  </div>
+  <nav class="navbar__mobile" id="nav-mobile">
+    <a href=".." class="navbar__mobile-link">Home</a>
+    <a href="../ann/" class="navbar__mobile-link">News</a>
+    <a href="../faq/" class="navbar__mobile-link">Support</a>
+  </nav>
+</header>
+
+<div class="vip-hero">
+  <div class="vip-eyebrow">
+    <span>VIP Exclusive</span>
+  </div>
+  <h1>VIP Notifications</h1>
+  <p id="pageSubtext">Loading...</p>
+</div>
+
+<section class="vip-main">
+  <div id="vipContainer">
+    <div class="vip-empty">
+      <div class="spinner"></div>
+      <p style="margin-top:12px;color:var(--color-muted);">Loading notifications...</p>
+    </div>
+  </div>
+</section>
+
+<footer class="footer">
+  <div class="footer__grid container">
+    <div class="footer__col">
+      <a href=".." style="display:inline-block;margin-bottom:1rem;">
+        <img src="../images/icon2.png" alt="GameVault" style="height:200px;width:auto;">
+      </a>
+      <p class="footer__brand">Premium game downloads platform. Instant access, no setup required. 400+ games available.</p>
+      <div class="footer__social">
+        <a href="https://www.facebook.com/profile.php?id=61590194378758" target="_blank" aria-label="Facebook">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+        </a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Quick Links</div>
+      <div class="footer__links">
+        <a href="..">Home</a>
+        <a href="../ann/">News</a>
+        <a href="../faq/">Support</a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Support</div>
+      <div class="footer__links">
+        <a href="../faq/">FAQ</a>
+        <a href="../payment/">Payment Plans</a>
+        <a href="../ann/">Announcements</a>
+      </div>
+    </div>
+    <div class="footer__col">
+      <div class="footer__heading">Legal</div>
+      <div class="footer__links">
+        <a href="../privacy/">Privacy Policy</a>
+        <a href="../terms/">Terms of Service</a>
+        <a href="../refund/">Refund Policy</a>
+      </div>
+    </div>
+  </div>
+  <div class="footer__bottom">
+    <span>&copy; 2026 GameVault — All rights reserved.</span>
+    <div class="footer__legal">
+      <a href="../privacy/">Privacy</a>
+      <a href="../terms/">Terms</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import {
+    getFirestore, collection, onSnapshot, query, orderBy
+  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  const firebaseConfig = {
+    apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
+    authDomain: 'gamevault-6f5b1.firebaseapp.com',
+    projectId: 'gamevault-6f5b1',
+    storageBucket: 'gamevault-6f5b1.firebasestorage.app',
+    messagingSenderId: '958994391207',
+    appId: '1:958994391207:web:7c398da9bc39437c7ebb82'
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const db  = getFirestore(app);
+
+  const tier = (localStorage.getItem('gv_tier') || '').toLowerCase();
+  const container = document.getElementById('vipContainer');
+
+  if (tier !== 'vip') {
+    container.innerHTML = `
+      <div class="vip-access-denied">
+        <div class="vip-access-denied-icon"><div class="lock"></div></div>
+        <h2>VIP Access Required</h2>
+        <p>This page is exclusively for VIP members.</p>
+        <a href=".." class="btn-home">Back to Home</a>
+      </div>`;
+    document.getElementById('pageSubtext').textContent = 'Access Denied';
+    throw new Error('Not VIP');
+  }
+
+  function esc(s) {
+    return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  }
+
+  function formatDate(ts) {
+    if (!ts) return '';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    return d.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }) +
+      ' \u00b7 ' + d.toLocaleTimeString('en-US', { hour:'2-digit', minute:'2-digit' });
+  }
+
+  function timeAgo(ts) {
+    if (!ts) return '';
+    const d = ts.toDate ? ts.toDate() : new Date(ts);
+    const diff = Math.floor((Date.now() - d.getTime()) / 1000);
+    if (diff < 60)   return 'just now';
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    if (diff < 604800) return Math.floor(diff/86400) + 'd ago';
+    return formatDate(ts);
+  }
+
+  const RELEASE_CLASS = {
+    'Early Access': 'release',
+    'Beta': 'beta',
+    'Demo': 'demo'
+  };
+
+  let allNotifs = [];
+
+  function render() {
+    const readIdsNow = (() => {
+      try { return JSON.parse(localStorage.getItem('gv_read_notifs')) || []; } catch { return []; }
+    })();
+
+    document.getElementById('pageSubtext').textContent =
+      `${allNotifs.length} notification${allNotifs.length !== 1 ? 's' : ''}`;
+
+    if (!allNotifs.length) {
+      container.innerHTML = `
+        <div class="vip-empty">
+          <div class="vip-empty-icon"><div class="dot"></div></div>
+          <h3>No notifications yet</h3>
+          <p>VIP notifications about early access, beta, and demo releases will appear here.</p>
+        </div>`;
+      return;
+    }
+
+    container.innerHTML = allNotifs.map((n, idx) => {
+      const isUnread = !readIdsNow.includes(n.id);
+      const status = n.releaseStatus || '';
+      const dotClass = RELEASE_CLASS[status] || 'release';
+      const statusLower = status.toLowerCase().replace(/\s+/g, '');
+      return `
+        <div class="vip-card${isUnread ? ' unread' : ''}" style="animation-delay:${idx * 0.05}s">
+          <div class="vip-card-indicator"><div class="dot ${dotClass}"></div></div>
+          <div class="vip-card-body">
+            <div class="vip-card-meta">
+              <span class="vip-status-badge ${statusLower}">${esc(status)}</span>
+              ${isUnread ? '<span class="vip-unread-tag">NEW</span>' : ''}
+              <span class="vip-card-time">${timeAgo(n.created_at)}</span>
+            </div>
+            <div class="vip-card-title">${esc(n.gameName || 'Game Update')}</div>
+            <div class="vip-card-message">${esc(n.message || '')}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  onSnapshot(
+    query(collection(db, 'vip_notifications'), orderBy('created_at', 'desc')),
+    snap => {
+      allNotifs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      render();
+    },
+    err => {
+      container.innerHTML = `
+        <div class="vip-empty">
+          <div class="vip-error-icon"><span class="exclaim">!</span></div>
+          <h3>Couldn't load</h3>
+          <p>${esc(err.message)}</p>
+        </div>`;
+    }
+  );
+</script>
+
+</div>
+
+<script>
+function initBg() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, animId;
+  const particles = [];
+  const PARTICLE_COUNT = 35;
+  const CONNECT_DIST = 100;
+  const isMobile = window.innerWidth < 768;
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * w, y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+      r: 1 + Math.random()
+    });
+  }
+
+  let skip = 0;
+  function draw() {
+    animId = requestAnimationFrame(draw);
+    skip++;
+    if (skip % 3) return;
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(139,92,246,0.1)'; ctx.fill();
+    }
+
+    if (!isMobile) {
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < CONNECT_DIST) {
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.strokeStyle = `rgba(139,92,246,${0.035 * (1 - dist / CONNECT_DIST)})`;
+            ctx.lineWidth = 0.5; ctx.stroke();
+          }
+        }
+      }
+    }
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) cancelAnimationFrame(animId); else draw();
+  });
+  draw();
+}
+initBg();
+
+const hamburger = document.getElementById('nav-hamburger');
+const mobileNav = document.getElementById('nav-mobile');
+if (hamburger && mobileNav) {
+  hamburger.addEventListener('click', () => {
+    hamburger.classList.toggle('active');
+    mobileNav.classList.toggle('open');
+  });
+  mobileNav.querySelectorAll('.navbar__mobile-link').forEach(link => {
+    link.addEventListener('click', () => {
+      hamburger.classList.remove('active');
+      mobileNav.classList.remove('open');
+    });
+  });
+}
+</script>
+
+</body>
+</html>

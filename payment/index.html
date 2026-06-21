@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-Frame-Options" content="DENY">
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin">
+  <title>GameVault — Unlock Access | Secure Checkout</title>
+  <link rel="icon" type="image/png" href="../images/Logo.jpg" />
+  <link rel="stylesheet" href="../css/style.css">
+  <style>
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+      background: var(--color-bg);
+      color: #eef2ff;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.5rem;
+      overflow-x: hidden;
+      position: relative;
+    }
+
+    
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(2px 2px at 20% 30%, rgba(59,130,246,0.2), transparent),
+        radial-gradient(3px 3px at 50% 70%, rgba(139,92,246,0.15), transparent),
+        radial-gradient(2px 2px at 80% 40%, rgba(59,130,246,0.12), transparent),
+        radial-gradient(1px 1px at 10% 90%, rgba(255,255,255,0.08), transparent),
+        radial-gradient(1px 1px at 90% 10%, rgba(139,92,246,0.12), transparent);
+      background-size: 200px 200px;
+      animation: drift 40s linear infinite;
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    @keyframes drift {
+      0% { transform: translate(0,0); }
+      100% { transform: translate(-40px,-40px); }
+    }
+
+    .particles {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .particles span {
+      position: absolute;
+      width: 4px;
+      height: 4px;
+      background: rgba(59,130,246,0.4);
+      border-radius: 50%;
+      animation: float linear infinite;
+    }
+    @keyframes float {
+      0% { transform: translateY(100vh) scale(0); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateY(-10vh) scale(1); opacity: 0; }
+    }
+
+    .container {
+      max-width: 1280px;
+      width: 100%;
+      position: relative;
+      z-index: 2;
+    }
+
+    
+    .game-header {
+      text-align: center;
+      margin-bottom: 2rem;
+      animation: fadeDown 0.8s ease;
+    }
+    @keyframes fadeDown {
+      0% { opacity: 0; transform: translateY(-30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+    .wordmark {
+      font-size: 3rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      letter-spacing: -1px;
+      text-decoration: none;
+      display: inline-block;
+    }
+    .tagline {
+      color: #7e8a98;
+      font-size: 0.9rem;
+      margin-top: 0.25rem;
+    }
+
+    
+    .steps-wrapper {
+      max-width: 600px;
+      margin: 1.8rem auto 2.2rem auto;
+    }
+    .steps {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+      background: #14141ecc;
+      backdrop-filter: blur(4px);
+      padding: 0.7rem 1.2rem;
+      border-radius: 60px;
+      border: 1px solid #2a2a3e;
+    }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #6c6f8a;
+    }
+    .step.active {
+      color: #3b82f6;
+    }
+    .step.done {
+      color: #10b981;
+    }
+    .step-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 28px;
+      background: #1e1e2c;
+      border: 1px solid #2e2e48;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+    }
+    .step.active .step-dot {
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border: none;
+      color: #0a0a0f;
+    }
+    .step.done .step-dot {
+      background: rgba(16,185,129,0.15);
+      border-color: #10b981;
+      color: #10b981;
+    }
+    .step-line {
+      width: 36px;
+      height: 1px;
+      background: #2a2a3e;
+      margin: 0 4px;
+    }
+
+    
+    .section {
+      display: none;
+      animation: fadeSlide 0.35s ease;
+    }
+    .section.active {
+      display: block;
+    }
+    @keyframes fadeSlide {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    
+    .plans-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(270px, 1fr));
+      gap: 1.8rem;
+      margin: 1rem 0 2rem;
+    }
+    .plan-card {
+      background: linear-gradient(145deg, #14141e, #1a1a28);
+      border: 1px solid #2a2a3e;
+      border-radius: 28px;
+      padding: 1.8rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      position: relative;
+      transition: transform 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.1), border-color 0.2s, box-shadow 0.2s;
+      cursor: pointer;
+      overflow: hidden;
+    }
+    .plan-card::after {
+      content: "";
+      position: absolute;
+      top: -50%;
+      left: -50%;
+      width: 200%;
+      height: 200%;
+      background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgba(59,130,246,0.1), transparent 60%);
+      opacity: 0;
+      transition: opacity 0.4s;
+      pointer-events: none;
+    }
+    .plan-card:hover::after {
+      opacity: 1;
+    }
+    .plan-card:hover {
+      transform: translateY(-6px) scale(1.01);
+      border-color: #3b82f6;
+      box-shadow: 0 20px 35px -12px rgba(59,130,246,0.25);
+    }
+    .plan-card.selected {
+      border: 2px solid #3b82f6;
+      box-shadow: 0 0 0 3px rgba(59,130,246,0.25);
+    }
+    .plan-card.featured {
+      border-color: #8b5cf6;
+    }
+    .featured-badge {
+      position: absolute;
+      top: 14px;
+      right: 14px;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      color: #ffffff;
+      font-size: 0.65rem;
+      font-weight: 800;
+      text-transform: uppercase;
+      padding: 0.25rem 1rem;
+      border-radius: 40px;
+      letter-spacing: 0.5px;
+    }
+    .plan-name {
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: white;
+      margin-bottom: 0.25rem;
+    }
+    .plan-price {
+      font-size: 2.2rem;
+      font-weight: 800;
+      color: #3b82f6;
+      margin: 0.5rem 0 0.1rem;
+    }
+    .plan-price span {
+      font-size: 0.9rem;
+      font-weight: 500;
+      color: #8e9aaf;
+    }
+    .plan-duration {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-bottom: 1.2rem;
+      border-bottom: 1px dashed #2a2a3e;
+      display: inline-block;
+      padding-bottom: 4px;
+    }
+    .game-list-label {
+      font-size: 0.7rem;
+      color: #6c6f8a;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 0.5rem;
+    }
+    .feature-list {
+      list-style: none;
+      margin: 0.5rem 0 1.5rem 0;
+      flex: 1;
+    }
+    .feature-list li {
+      font-size: 0.8rem;
+      padding: 0.3rem 0;
+      color: #b9c3d4;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .feature-list li::before {
+      content: "•";
+      color: #3b82f6;
+      font-weight: bold;
+      font-size: 1rem;
+    }
+    .card-footer {
+      margin-top: auto;
+    }
+
+    
+    .form-box, .payment-box, .waiting-box, .success-box {
+      background: #14141e;
+      border: 1px solid #2a2a3e;
+      border-radius: 32px;
+      padding: 2rem 2rem;
+      max-width: 540px;
+      margin: 0 auto;
+      backdrop-filter: blur(2px);
+    }
+    .form-title {
+      font-size: 1.6rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #ffffff, #3b82f6);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .selected-summary {
+      background: rgba(59,130,246,0.08);
+      border-left: 3px solid #3b82f6;
+      padding: 0.8rem 1rem;
+      border-radius: 18px;
+      margin: 1rem 0;
+    }
+    .f-group {
+      margin-bottom: 1.2rem;
+      text-align: left;
+    }
+    .f-group label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: #9ca3af;
+      margin-bottom: 0.4rem;
+      display: block;
+    }
+    .f-group input {
+      width: 100%;
+      background: #0f0f17;
+      border: 1px solid #2e2e48;
+      border-radius: 20px;
+      padding: 12px 16px;
+      color: white;
+      font-size: 0.9rem;
+      outline: none;
+      transition: 0.2s;
+    }
+    .f-group input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+    }
+    .btn-cta {
+      width: 100%;
+      background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+      border: none;
+      border-radius: 40px;
+      padding: 12px 20px;
+      font-weight: 800;
+      color: #ffffff;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .btn-cta:hover { opacity: 0.92; transform: scale(0.98); }
+    .btn-back {
+      background: none;
+      border: none;
+      color: #7e8a98;
+      font-size: 0.75rem;
+      margin-top: 1rem;
+      cursor: pointer;
+      width: 100%;
+    }
+    .btn-back:hover { color: #3b82f6; }
+    .info-box {
+      background: rgba(59,130,246,0.05);
+      border-left: 3px solid #3b82f6;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 0.7rem;
+      margin: 1rem 0;
+    }
+    .qr-frame {
+      width: 160px;
+      height: 160px;
+      margin: 0 auto 1rem;
+      background: white;
+      border-radius: 20px;
+      overflow: hidden;
+      border: 2px solid #2e2e48;
+    }
+    .qr-frame img {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+    .payment-amount {
+      font-size: 2.4rem;
+      font-weight: 800;
+      color: #3b82f6;
+    }
+    .err-msg {
+      background: rgba(239,68,68,0.1);
+      border-left: 3px solid #ef4444;
+      border-radius: 16px;
+      padding: 8px 12px;
+      font-size: 0.7rem;
+      margin-top: 8px;
+      display: none;
+    }
+    .err-msg.show { display: block; }
+    .pulse-ring {
+      width: 64px;
+      height: 64px;
+      border: 3px solid #3b82f6;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 1rem;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .success-icon {
+      width: 68px;
+      height: 68px;
+      background: rgba(16,185,129,0.12);
+      border-radius: 100px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 2rem;
+      margin: 0 auto 1rem;
+      color: #10b981;
+    }
+    .code-display {
+      background: #0f0f17;
+      border: 1px dashed #3b82f6;
+      border-radius: 24px;
+      padding: 1rem;
+    }
+    .code-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 1.4rem;
+      letter-spacing: 2px;
+    }
+    .fineprint {
+      text-align: center;
+      margin-top: 2.5rem;
+      color: #5c6478;
+      font-size: 0.7rem;
+    }
+    .spinner {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255,255,255,0.2);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.6s linear infinite;
+      margin-right: 6px;
+      vertical-align: middle;
+    }
+    @media (max-width: 700px) {
+      body { padding: 1rem; }
+      .steps { gap: 0.1rem; }
+      .step-line { width: 20px; }
+    }
+  </style>
+</head>
+<body>
+<canvas id="bgCanvas"></canvas>
+<div class="bg-overlay"></div>
+<div class="grid-overlay"></div>
+<div class="content-wrap">
+<div class="particles" id="particles"></div>
+<div class="container">
+  <div class="game-header">
+    <a href=".." style="display:inline-block;">
+      <img src="../images/icon.png" alt="GameVault" style="height:150px;width:auto;"></a>
+    <div class="tagline">secure checkout • pay with gcash • instant activation</div>
+  </div>
+
+  <div class="steps-wrapper">
+    <div class="steps">
+      <div class="step active" id="step1"><div class="step-dot">1</div>Plan</div>
+      <div class="step-line"></div>
+      <div class="step" id="step2"><div class="step-dot">2</div>Email</div>
+      <div class="step-line"></div>
+      <div class="step" id="step3"><div class="step-dot">3</div>Payment</div>
+      <div class="step-line"></div>
+      <div class="step" id="step4"><div class="step-dot">4</div>Verify</div>
+    </div>
+  </div>
+
+  
+  <div class="section active" id="sec-plans">
+    <div class="plans-grid">
+      
+      <div class="plan-card" data-plan="2 Days" data-price="55" data-devices="1" data-days="2">
+        <div class="featured-badge" style="background:linear-gradient(135deg,#10b981,#059669);">MEMBER</div>
+        <div class="plan-name">2 Day Pass</div>
+        <div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:6px;">₱65</span> ₱55 <span>PHP</span></div>
+        <div class="plan-duration">2 days · 1 device</div>
+        <div class="game-list-label">includes</div>
+        <ul class="feature-list">
+          <li>All games</li>
+          <li>Software & Tools (MS Office, etc.)</li>
+          <li>1 device</li>
+
+          <li>Member Badge on Account</li>
+        </ul>
+      </div>
+      
+      <div class="plan-card" data-plan="3 Days" data-price="65" data-devices="3" data-days="3">
+        <div class="featured-badge" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);">ELITE</div>
+        <div class="plan-name">3 Day Pass</div>
+        <div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:6px;">₱99</span> ₱65 <span>PHP</span></div>
+        <div class="plan-duration">3 days · 3 devices</div>
+        <div class="game-list-label">includes</div>
+        <ul class="feature-list">
+          <li>Full vault access</li>
+          <li>Software & Tools (MS Office, etc.)</li>
+          <li>3 devices</li>
+          <li>Elite Badge on Account</li>
+          <li>Priority support via FB page</li>
+        </ul>
+      </div>
+      
+      <div class="plan-card featured" data-plan="Lifetime" data-price="99" data-devices="-1" data-days="-1">
+        <div class="featured-badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444);">VIP</div>
+        <div class="plan-name">Lifetime</div>
+        <div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:6px;">₱129</span> ₱99 <span>PHP</span></div>
+        <div class="plan-duration">Lifetime · any device</div>
+        <div class="game-list-label">includes</div>
+        <ul class="feature-list">
+          <li>Unlimited everything</li>
+          <li>All games + software updates</li>
+          <li>Software & Tools (MS Office, etc.)</li>
+          <li>Any device</li>
+          <li>Premium VIP Badge on Account</li>
+          <li>Custom Welcome Message</li>
+          <li>Early access to new releases</li>
+          <li>No Need Input Email</li>
+          <li>VIP code</li>
+          <li>VIP support + Chatbot Assistant</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  
+  <div class="section" id="sec-email">
+    <div class="form-box">
+      <div class="form-title">Where should we send the code?</div>
+      <div class="selected-summary" id="planSummary">—</div>
+      <div class="f-group">
+        <label>Email address</label>
+        <input type="email" id="customerEmail" placeholder="gamer@example.com">
+      </div>
+      <div class="err-msg" id="emailErr"></div>
+      <button class="btn-cta" id="proceedToPayBtn">PROCEED TO GCASH →</button>
+      <button class="btn-back" onclick="goTo(1)">← back to plans</button>
+    </div>
+  </div>
+
+  
+  <div class="section" id="sec-payment">
+    <div class="payment-box">
+      <div style="text-align:center; font-size:11px; letter-spacing:2px;">GCASH EXPRESS</div>
+      <div class="payment-amount" id="payAmount">₱0</div>
+      <div style="margin:4px 0 10px">Pay to: <strong>GameVault · 0912 345 6789</strong></div>
+      <div class="qr-frame">
+        <img id="gcashQr" src="../images/gcash-qr.jpg" alt="QR" onerror="this.src='https://placehold.co/200x200?text=SCAN+QR+GCash&bg=white&textColor=black';">
+      </div>
+      <div class="info-box">
+        Tip: GCash → Scan QR or Send Money → Exact amount → Copy 13-digit Reference Number from receipt.
+      </div>
+      <div class="info-box" style="background:transparent; margin-bottom:10px;">
+        <div style="display:flex; justify-content:space-between;"><span>Plan:</span><span id="dispPlan">—</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Amount:</span><span id="dispAmount">—</span></div>
+        <div style="display:flex; justify-content:space-between;"><span>Email:</span><span id="dispEmail">—</span></div>
+      </div>
+      <div class="f-group">
+        <label>GCash Reference Number</label>
+        <input type="text" id="gcashRef" class="mono" placeholder="e.g. 1234567890123" maxlength="20">
+        <div style="font-size:9px; margin-top:5px;">Found in transaction history (digits only)</div>
+      </div>
+      <div class="err-msg" id="refErr"></div>
+      <button id="submitOrderBtn" class="btn-cta">SUBMIT & VERIFY →</button>
+      <button class="btn-back" onclick="goTo(2)">← change email</button>
+    </div>
+  </div>
+
+  
+  <div class="section" id="sec-waiting">
+    <div class="waiting-box">
+      <div class="pulse-ring"></div>
+      <h2 style="font-weight:800; font-size:1.6rem;">Payment submitted</h2>
+      <p style="margin: 0.5rem 0;">Verifying GCash transaction ...</p>
+      <div style="font-weight:600; color:#3b82f6;" id="waitingEmail">—</div>
+      <div class="info-box" style="margin-top:1rem;">
+        Verification 1–10 min · auto‑refresh · check spam folder
+      </div>
+      <div style="font-size:12px; margin-top:1rem;">Ref: <span id="waitingRef" style="font-family:monospace;"></span></div>
+    </div>
+  </div>
+
+  
+  <div class="section" id="sec-success">
+    <div class="success-box">
+      <div class="success-icon">✔</div>
+      <h2 style="font-weight:800;">Access Unlocked!</h2>
+      <p>Your activation code is ready.</p>
+      <div class="code-display" id="successCodeDisplay" style="display:none; margin-top:1rem;">
+        <div style="font-size:0.6rem; letter-spacing:2px;">YOUR UNIQUE CODE</div>
+        <div class="code-val" id="successCode">——</div>
+        <button onclick="copyCode()" style="margin-top:12px; background:#2a2a3e; border:none; border-radius:40px; padding:6px 20px; color:#3b82f6; cursor:pointer; font-weight:600;">Copy code</button>
+      </div>
+      <p style="margin-top:1rem; font-size:12px;">Also sent to your email. Enjoy!</p>
+      <a href=".." style="display:inline-block; margin-top:1rem; background:linear-gradient(135deg,#3b82f6,#8b5cf6); color:#ffffff; font-weight:700; padding:10px 28px; border-radius:40px; text-decoration:none;">GO TO GAMEVAULT →</a>
+    </div>
+  </div>
+  <div class="fineprint">
+    Secure checkout • Prices in PHP • One-time payment • No hidden fees.<br> <a href="../privacy/" style="color:#3b82f6;">Privacy</a> · <a href="../terms/" style="color:#3b82f6;">Terms</a> · <a href="../refund/" style="color:#3b82f6;">Refund</a> · Support: <a href="#" style="color:#3b82f6;">gamevault0fficial.ph</a>
+  </div>
+</div>
+
+<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getFirestore, doc, setDoc, getDocs, query, collection, where, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+  // ---------- EMAILJS CONFIG (original) ----------
+  const EMAILJS_PUBLIC_KEY  = 'AIK-MdQg9DeDaqyEn';
+  const EMAILJS_SERVICE_ID  = 'service_v5br03m';
+  const EMAILJS_TEMPLATE_ID = 'template_u0ixb39';
+  window.emailjs.init(EMAILJS_PUBLIC_KEY);
+
+  // SERVER-SIDE PLAN CATALOG (locked)
+  const PLAN_CATALOG = {
+    '2 Days':    { price: 55,  devices: 1,  days: 2   },
+    '3 Days':    { price: 65,  devices: 3,  days: 3   },
+    'Lifetime':  { price: 99, devices: -1, days: -1  }
+  };
+
+  const firebaseConfig = {
+    apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
+    authDomain: 'gamevault-6f5b1.firebaseapp.com',
+    projectId: 'gamevault-6f5b1',
+    storageBucket: 'gamevault-6f5b1.firebasestorage.app',
+    messagingSenderId: '958994391207',
+    appId: '1:958994391207:web:7c398da9bc39437c7ebb82'
+  };
+  const app = initializeApp(firebaseConfig);
+  const db = getFirestore(app);
+
+  let flowStep = 1;
+  let selectedPlanKey = '';
+  let selectedEmail = '';
+  let orderId = '';
+  let orderUnsub = null;
+  let orderSubmitted = false;
+
+  function showErr(id, msg) { const e = document.getElementById(id); e.textContent = msg; e.classList.add('show'); }
+  function hideErr(id) { document.getElementById(id).classList.remove('show'); }
+
+  const sections = ['plans','email','payment','waiting','success'];
+  window.goTo = function(num) {
+    if (orderSubmitted && num < 4) return;
+    if (num > flowStep + 1 && num > 2) return;
+    flowStep = num;
+    sections.forEach((s, i) => {
+      const sec = document.getElementById(`sec-${s}`);
+      if (sec) sec.classList.toggle('active', i+1 === num);
+    });
+    for (let i=1; i<=4; i++) {
+      const stepDiv = document.getElementById(`step${i}`);
+      if(stepDiv) {
+        stepDiv.classList.remove('active','done');
+        if(i < num) stepDiv.classList.add('done');
+        else if(i === num) stepDiv.classList.add('active');
+      }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+  history.pushState(null,'',location.href);
+  window.addEventListener('popstate',()=>{ history.pushState(null,'',location.href); if(!orderSubmitted && flowStep>1) goTo(flowStep-1); });
+
+  // plan selection + mouse glow effect
+  document.querySelectorAll('.plan-card').forEach(card => {
+    card.addEventListener('mousemove', e => {
+      const rect = card.getBoundingClientRect();
+      const x = ((e.clientX - rect.left) / rect.width) * 100;
+      const y = ((e.clientY - rect.top) / rect.height) * 100;
+      card.style.setProperty('--mx', x + '%');
+      card.style.setProperty('--my', y + '%');
+    });
+    card.addEventListener('click', () => {
+      const planKey = card.dataset.plan;
+      if (!PLAN_CATALOG[planKey]) return;
+      document.querySelectorAll('.plan-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      selectedPlanKey = planKey;
+      const { price, devices, days } = PLAN_CATALOG[planKey];
+      const dev = devices === -1 ? 'Any device' : devices + ' device' + (devices > 1 ? 's' : '');
+      const dur = days === -1 ? 'Lifetime' : days + ' day' + (days > 1 ? 's' : '');
+      document.getElementById('planSummary').innerHTML = `<strong style="color:white;">${planKey}</strong> — <span style="color:#3b82f6;">₱${price}</span> · ${dur} · ${dev}`;
+      goTo(2);
+    });
+  });
+
+  document.getElementById('proceedToPayBtn').addEventListener('click', () => {
+    if (!PLAN_CATALOG[selectedPlanKey]) { goTo(1); return; }
+    const email = document.getElementById('customerEmail').value.trim();
+    hideErr('emailErr');
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      showErr('emailErr', 'Enter a valid email address'); return;
+    }
+    selectedEmail = email;
+    const { price } = PLAN_CATALOG[selectedPlanKey];
+    document.getElementById('payAmount').innerHTML = `₱${price}`;
+    document.getElementById('dispPlan').innerHTML = selectedPlanKey;
+    document.getElementById('dispAmount').innerHTML = `₱${price}`;
+    document.getElementById('dispEmail').innerHTML = selectedEmail;
+    goTo(3);
+  });
+
+  document.getElementById('submitOrderBtn').addEventListener('click', async () => {
+    if (orderSubmitted) return;
+    if (!PLAN_CATALOG[selectedPlanKey] || !selectedEmail) { goTo(1); return; }
+    const ref = document.getElementById('gcashRef').value.trim().replace(/\s/g,'');
+    hideErr('refErr');
+    if (!ref || ref.length < 8 || !/^\d+$/.test(ref)) {
+      showErr('refErr', 'Please enter a valid GCash reference number (digits only, min 8)'); return;
+    }
+    const btn = document.getElementById('submitOrderBtn');
+    btn.disabled = true; btn.innerHTML = '<span class="spinner"></span> Submitting...';
+    try {
+      try {
+        const dupSnap = await getDocs(query(collection(db, 'orders'), where('gcashRef', '==', ref)));
+        if (!dupSnap.empty) {
+          showErr('refErr', 'Reference already used. Contact support.');
+          btn.disabled = false; btn.innerHTML = 'SUBMIT & VERIFY →'; return;
+        }
+      } catch (_) {}
+      const { price, devices, days } = PLAN_CATALOG[selectedPlanKey];
+      orderId = 'ORD-' + Date.now() + '-' + Math.random().toString(36).slice(2,8).toUpperCase();
+      await setDoc(doc(db, 'orders', orderId), {
+        orderId, plan: selectedPlanKey, price, devices, days, email: selectedEmail, gcashRef: ref,
+        status: 'pending', approved_at: null, code: null
+      });
+      orderSubmitted = true;
+      document.getElementById('waitingEmail').innerHTML = selectedEmail;
+      document.getElementById('waitingRef').innerHTML = ref;
+      goTo(4);
+      startOrderListener(orderId);
+    } catch(err) {
+      showErr('refErr', 'Network error: ' + err.message);
+      btn.disabled = false; btn.innerHTML = 'SUBMIT & VERIFY →';
+    }
+  });
+
+  function startOrderListener(oid) {
+    if (orderUnsub) orderUnsub();
+    orderUnsub = onSnapshot(doc(db, 'orders', oid), async (snap) => {
+      if (!snap.exists()) return;
+      const data = snap.data();
+      if (data.status === 'approved' && data.code) {
+        if (orderUnsub) { orderUnsub(); orderUnsub = null; }
+        document.getElementById('successCode').innerHTML = data.code;
+        document.getElementById('successCodeDisplay').style.display = 'block';
+        goTo(5);
+        const expiry = data.days === -1 ? 'Lifetime' : data.days + ' day' + (data.days > 1 ? 's' : '');
+        const devInfo = data.devices === -1 ? 'Any device' : data.devices + ' device' + (data.devices > 1 ? 's' : '');
+        try {
+          await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+            to_email: data.email, to_name: data.email.split('@')[0], code: data.code,
+            plan: data.plan + ' (' + expiry + ', ' + devInfo + ')', expiry: expiry + ' · ' + devInfo
+          });
+        } catch(e) { console.warn("email send issue"); }
+      }
+      if (data.status === 'rejected') {
+        if(orderUnsub) orderUnsub();
+        const waitingDiv = document.querySelector('#sec-waiting .waiting-box');
+        if(waitingDiv) waitingDiv.innerHTML = `<div style="font-size:48px;">✗</div><h2>Payment not verified</h2><p>Reference invalid. Contact support.</p><a href=".." style="color:#3b82f6;">← Back</a>`;
+      }
+    });
+  }
+
+  window.copyCode = () => {
+    const code = document.getElementById('successCode').innerText;
+    navigator.clipboard.writeText(code).then(() => alert('Activation code copied!'));
+  };
+
+  // generate floating particles
+  const particlesContainer = document.getElementById('particles');
+  for (let i=0;i<40;i++) {
+    const span = document.createElement('span');
+    span.style.left = Math.random() * 100 + '%';
+    const size = 2 + Math.random() * 5;
+    span.style.width = size + 'px';
+    span.style.height = size + 'px';
+    span.style.animationDuration = (12 + Math.random() * 30) + 's';
+    span.style.animationDelay = (Math.random() * 20) + 's';
+    span.style.opacity = 0.2 + Math.random() * 0.5;
+    particlesContainer.appendChild(span);
+  }
+</script>
+
+</div>
+
+<script>
+function initBg() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h;
+  const particles = [];
+  const PARTICLE_COUNT = 70;
+  const CONNECT_DIST = 120;
+
+  function resize() {
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) {
+    particles.push({
+      x: Math.random() * w,
+      y: Math.random() * h,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: (Math.random() - 0.5) * 0.4,
+      r: 1 + Math.random() * 1.5
+    });
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      if (p.x < 0) p.x = w;
+      if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h;
+      if (p.y > h) p.y = 0;
+
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(45,212,191,0.2)';
+      ctx.fill();
+
+      for (let j = i + 1; j < particles.length; j++) {
+        const p2 = particles[j];
+        const dx = p.x - p2.x;
+        const dy = p.y - p2.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECT_DIST) {
+          ctx.beginPath();
+          ctx.moveTo(p.x, p.y);
+          ctx.lineTo(p2.x, p2.y);
+          ctx.strokeStyle = `rgba(45,212,191,${0.06 * (1 - dist / CONNECT_DIST)})`;
+          ctx.lineWidth = 0.6;
+          ctx.stroke();
+        }
+      }
+    }
+    requestAnimationFrame(draw);
+  }
+  draw();
+}
+initBg();
+</script>
+
+</body>
+</html>

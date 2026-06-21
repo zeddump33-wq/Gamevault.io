@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>404 - Page Not Found | GameVault</title>
+  <link rel="icon" type="image/png" href="images/Logo.jpg" />
+  <link rel="stylesheet" href="css/style.css" />
+  <style>
+    .error-page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 2rem;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .error-bg-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      pointer-events: none;
+      z-index: 0;
+    }
+    .error-bg-text span {
+      font-family: var(--font-display);
+      font-size: clamp(240px, 50vw, 600px);
+      font-weight: 900;
+      letter-spacing: -0.06em;
+      background: linear-gradient(180deg, rgba(59,130,246,0.04), rgba(139,92,246,0.02));
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      line-height: 1;
+      position: relative;
+      animation: bgGlow 4s ease-in-out infinite;
+    }
+    @keyframes bgGlow {
+      0%, 100% { filter: drop-shadow(0 0 40px rgba(59,130,246,0.03)); }
+      50% { filter: drop-shadow(0 0 80px rgba(59,130,246,0.06)); }
+    }
+
+    .glitch-blocks {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+    .glitch-block {
+      position: absolute;
+      background: linear-gradient(135deg, rgba(59,130,246,0.06), rgba(139,92,246,0.04));
+      border-radius: 4px;
+      animation: blockDrift linear infinite;
+    }
+    .glitch-block:nth-child(1) { width: 80px; height: 12px; top: 15%; left: 10%; animation-duration: 14s; animation-delay: 0s; }
+    .glitch-block:nth-child(2) { width: 50px; height: 8px; top: 70%; right: 8%; animation-duration: 18s; animation-delay: 2s; }
+    .glitch-block:nth-child(3) { width: 100px; height: 6px; bottom: 20%; left: 20%; animation-duration: 12s; animation-delay: 4s; }
+    .glitch-block:nth-child(4) { width: 40px; height: 10px; top: 40%; right: 15%; animation-duration: 16s; animation-delay: 1s; }
+    .glitch-block:nth-child(5) { width: 70px; height: 7px; top: 10%; right: 25%; animation-duration: 15s; animation-delay: 3s; }
+    .glitch-block:nth-child(6) { width: 55px; height: 9px; bottom: 35%; left: 5%; animation-duration: 13s; animation-delay: 5s; }
+    @keyframes blockDrift {
+      0% { transform: translateX(-120px) translateY(0) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 1; }
+      100% { transform: translateX(calc(100vw + 120px)) translateY(-30px) rotate(15deg); opacity: 0; }
+    }
+
+    .glitch-bar {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(59,130,246,0.12), rgba(139,92,246,0.12), transparent);
+      pointer-events: none;
+      z-index: 0;
+      animation: barSweep 8s ease-in-out infinite;
+    }
+    .glitch-bar:nth-child(1) { top: 25%; animation-delay: 0s; }
+    .glitch-bar:nth-child(2) { top: 55%; animation-delay: 2.6s; }
+    .glitch-bar:nth-child(3) { top: 78%; animation-delay: 5.2s; }
+    @keyframes barSweep {
+      0%, 10%, 100% { transform: scaleX(0); opacity: 0; }
+      5% { transform: scaleX(1); opacity: 1; }
+      7% { transform: scaleX(0.8); opacity: 0.8; }
+    }
+
+    .ring-container {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 0;
+    }
+    .ring {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      border-radius: 50%;
+      border: 1px solid rgba(59,130,246,0.06);
+      transform: translate(-50%, -50%);
+      animation: ringExpand 4s ease-out infinite;
+    }
+    .ring:nth-child(1) { width: 200px; height: 200px; animation-delay: 0s; }
+    .ring:nth-child(2) { width: 400px; height: 400px; animation-delay: 1.3s; }
+    .ring:nth-child(3) { width: 600px; height: 600px; animation-delay: 2.6s; }
+    .ring:nth-child(4) { width: 800px; height: 800px; animation-delay: 3.9s; }
+    @keyframes ringExpand {
+      0% { transform: translate(-50%, -50%) scale(0.3); opacity: 1; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+    }
+
+    .error-content {
+      position: relative;
+      z-index: 2;
+      animation: fadeUp 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+    @keyframes fadeUp {
+      0% { opacity: 0; transform: translateY(30px); }
+      100% { opacity: 1; transform: translateY(0); }
+    }
+
+    .error-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      text-transform: uppercase;
+      color: var(--color-text-2);
+      padding: 6px 16px;
+      border: 1px solid rgba(59,130,246,0.12);
+      border-radius: 99px;
+      background: rgba(59,130,246,0.04);
+      margin-bottom: 1.5rem;
+    }
+    .badge-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #ef4444;
+      animation: blink 1.2s steps(2, end) infinite;
+    }
+    .badge-dot:nth-child(3) { background: #f59e0b; animation-delay: 0.4s; }
+    .badge-dot:nth-child(4) { background: #10b981; animation-delay: 0.8s; }
+    @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.2; } }
+
+    .error-code-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      margin-bottom: 0.15em;
+    }
+    .error-char {
+      font-family: var(--font-display);
+      font-size: clamp(96px, 20vw, 200px);
+      font-weight: 900;
+      line-height: 1;
+      letter-spacing: -0.04em;
+      position: relative;
+      display: inline-block;
+      transition: transform 0.2s;
+    }
+    .error-char:nth-child(1) {
+      background: linear-gradient(135deg, #3b82f6, #60a5fa);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      animation: glitchJitter 1.5s steps(3, end) infinite;
+    }
+    .error-char:nth-child(2) {
+      background: linear-gradient(135deg, #8b5cf6, #a78bfa);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      animation: glitchJitter 1.5s steps(3, end) 0.15s infinite;
+    }
+    .error-char:nth-child(3) {
+      background: linear-gradient(135deg, #f59e0b, #fbbf24);
+      background-clip: text;
+      -webkit-background-clip: text;
+      color: transparent;
+      animation: glitchJitter 1.5s steps(3, end) 0.3s infinite;
+    }
+    @keyframes glitchJitter {
+      0%, 100% { transform: translate(0, 0) skewX(0deg); }
+      2% { transform: translate(3px, -2px) skewX(2deg); }
+      4% { transform: translate(-2px, 1px) skewX(-1deg); }
+      6% { transform: translate(1px, -1px) skewX(0deg); }
+      50% { transform: translate(0, 0) skewX(0deg); }
+    }
+
+    .error-char::before {
+      content: attr(data-char);
+      position: absolute;
+      inset: 0;
+      background: none;
+      color: rgba(59,130,246,0.08);
+      clip-path: inset(10% 0 70% 0);
+      transform: translateX(-3px);
+      animation: glitchBefore 2s steps(2, end) infinite;
+      pointer-events: none;
+    }
+    .error-char:nth-child(2)::before { color: rgba(139,92,246,0.08); }
+    .error-char:nth-child(3)::before { color: rgba(245,158,11,0.08); }
+    @keyframes glitchBefore {
+      0%, 100% { transform: translateX(-3px); }
+      50% { transform: translateX(3px); }
+    }
+
+    .error-char::after {
+      content: attr(data-char);
+      position: absolute;
+      inset: 0;
+      background: none;
+      color: rgba(59,130,246,0.06);
+      clip-path: inset(70% 0 10% 0);
+      transform: translateX(3px);
+      animation: glitchAfter 2.2s steps(2, end) infinite;
+      pointer-events: none;
+    }
+    .error-char:nth-child(2)::after { color: rgba(139,92,246,0.06); }
+    .error-char:nth-child(3)::after { color: rgba(245,158,11,0.06); }
+    @keyframes glitchAfter {
+      0%, 100% { transform: translateX(3px); }
+      50% { transform: translateX(-3px); }
+    }
+
+    .error-title {
+      font-family: var(--font-display);
+      font-size: clamp(18px, 2.8vw, 28px);
+      font-weight: 800;
+      color: var(--color-text);
+      margin: 0.6em 0 0.4em;
+      letter-spacing: 2px;
+    }
+
+    .error-desc {
+      color: var(--color-text-2);
+      font-size: var(--text-sm);
+      max-width: 400px;
+      margin: 0 auto 1.8em;
+      line-height: 1.8;
+    }
+
+    .error-actions {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .error-actions .btn {
+      min-width: 180px;
+      transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .error-actions .btn:hover {
+      transform: translateY(-2px);
+    }
+
+    .shard {
+      position: absolute;
+      width: 6px;
+      height: 6px;
+      background: rgba(59,130,246,0.15);
+      clip-path: polygon(50% 0%, 100% 50%, 50% 100%, 0% 50%);
+      pointer-events: none;
+      z-index: 1;
+      animation: shardFloat linear infinite;
+    }
+    .shard:nth-child(1) { top: 15%; left: 20%; animation-duration: 7s; animation-delay: 0s; width: 8px; height: 8px; }
+    .shard:nth-child(2) { top: 75%; right: 12%; animation-duration: 9s; animation-delay: 1s; width: 5px; height: 5px; }
+    .shard:nth-child(3) { top: 30%; right: 25%; animation-duration: 8s; animation-delay: 2s; width: 7px; height: 7px; }
+    .shard:nth-child(4) { bottom: 10%; left: 40%; animation-duration: 6s; animation-delay: 3s; width: 4px; height: 4px; }
+    .shard:nth-child(5) { top: 60%; left: 8%; animation-duration: 10s; animation-delay: 0.5s; width: 6px; height: 6px; }
+    .shard:nth-child(6) { top: 5%; right: 35%; animation-duration: 7.5s; animation-delay: 1.5s; width: 9px; height: 9px; }
+    .shard:nth-child(7) { bottom: 30%; right: 5%; animation-duration: 8.5s; animation-delay: 2.5s; width: 5px; height: 5px; }
+    .shard:nth-child(8) { top: 45%; left: 30%; animation-duration: 6.5s; animation-delay: 3.5s; width: 7px; height: 7px; }
+    @keyframes shardFloat {
+      0% { transform: translateY(0) rotate(0deg); opacity: 0; }
+      10% { opacity: 1; }
+      90% { opacity: 0.3; }
+      100% { transform: translateY(-200px) rotate(360deg); opacity: 0; }
+    }
+
+    .crt-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      pointer-events: none;
+      background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0,0,0,0.02) 2px,
+        rgba(0,0,0,0.02) 4px
+      );
+    }
+  </style>
+</head>
+<body>
+
+<canvas id="bgCanvas"></canvas>
+<div class="bg-overlay"></div>
+<div class="grid-overlay"></div>
+<div class="crt-overlay"></div>
+
+<div class="error-page">
+
+  <div class="error-bg-text"><span>404</span></div>
+
+  <div class="glitch-blocks">
+    <div class="glitch-block"></div>
+    <div class="glitch-block"></div>
+    <div class="glitch-block"></div>
+    <div class="glitch-block"></div>
+    <div class="glitch-block"></div>
+    <div class="glitch-block"></div>
+  </div>
+
+  <div class="glitch-bar"></div>
+  <div class="glitch-bar"></div>
+  <div class="glitch-bar"></div>
+
+  <div class="ring-container">
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+    <div class="ring"></div>
+  </div>
+
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+  <div class="shard"></div>
+
+  <div class="error-content">
+    <div class="error-badge">
+      <span class="badge-dot"></span>
+      <span class="badge-dot"></span>
+      <span class="badge-dot"></span>
+      ERROR 404
+    </div>
+
+    <div class="error-code-row">
+      <span class="error-char" data-char="4">4</span>
+      <span class="error-char" data-char="0">0</span>
+      <span class="error-char" data-char="4">4</span>
+    </div>
+
+    <h1 class="error-title">PAGE NOT FOUND</h1>
+    <p class="error-desc">This page doesn't exist anymore — it got deleted, moved, or never loaded. Even the best gamers get lost sometimes.</p>
+
+
+  </div>
+</div>
+
+<script>
+function initBg() {
+  const canvas = document.getElementById('bgCanvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  let w, h, animId;
+  const particles = [];
+  const PARTICLE_COUNT = 35;
+  const CONNECT_DIST = 100;
+  const isMobile = window.innerWidth < 768;
+
+  function resize() { w = canvas.width = window.innerWidth; h = canvas.height = window.innerHeight; }
+  window.addEventListener('resize', resize); resize();
+
+  for (let i = 0; i < PARTICLE_COUNT; i++) particles.push({
+    x: Math.random() * w, y: Math.random() * h,
+    vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3,
+    r: 1 + Math.random()
+  });
+
+  let skip = 0;
+  function draw() {
+    animId = requestAnimationFrame(draw);
+    skip++; if (skip % 3) return;
+    ctx.clearRect(0, 0, w, h);
+    for (let i = 0; i < particles.length; i++) {
+      const p = particles[i]; p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = w; if (p.x > w) p.x = 0;
+      if (p.y < 0) p.y = h; if (p.y > h) p.y = 0;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(45,212,191,0.18)'; ctx.fill();
+    }
+    if (!isMobile) {
+      for (let i = 0; i < particles.length; i++) for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x, dy = particles[i].y - particles[j].y;
+        if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < CONNECT_DIST) {
+          ctx.beginPath(); ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(45,212,191,${0.04 * (1 - dist / CONNECT_DIST)})`;
+          ctx.lineWidth = 0.5; ctx.stroke();
+        }
+      }
+    }
+  }
+  document.addEventListener('visibilitychange', () => { if (document.hidden) cancelAnimationFrame(animId); else draw(); });
+  draw();
+}
+initBg();
+</script>
+
+</body>
+</html>
