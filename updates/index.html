@@ -318,9 +318,7 @@
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import {
-    getFunctions, httpsCallable
-  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
+  import { getFirestore, doc, collection, getDoc, getDocs, updateDoc, arrayUnion, onSnapshot } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -332,11 +330,7 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const functions_ = getFunctions(app);
-  const verifyCodeFn = httpsCallable(functions_, 'verifyAccessCode');
-  const getGamesListFn = httpsCallable(functions_, 'getGamesList');
-  const getGameDownloadUrlFn = httpsCallable(functions_, 'getGameDownloadUrl');
-  const checkCodeStatusFn = httpsCallable(functions_, 'checkCodeStatus');
+  const db = getFirestore(app);
 
   const KEY_ACCESS = 'gv_access';
   const KEY_CODE = 'gv_code';
@@ -368,14 +362,13 @@
 
   async function getSecureDownloadUrl(gameId) {
     if (_urlCache.has(gameId)) return _urlCache.get(gameId);
-    const codeKey = localStorage.getItem(KEY_CODE);
     try {
-      const result = await getGameDownloadUrlFn({ gameId, codeKey });
-      if (result.data?.ok && result.data?.downloadUrl) {
-        _urlCache.set(gameId, result.data.downloadUrl);
-        return result.data.downloadUrl;
-      }
-      throw new Error('Access denied');
+      const docSnap = await getDoc(doc(db, 'games', gameId));
+      if (!docSnap.exists()) throw new Error('Not found');
+      const url = docSnap.data().downloadUrl;
+      if (!url) throw new Error('No URL');
+      _urlCache.set(gameId, url);
+      return url;
     } catch (err) {
       throw new Error('Access denied');
     }
@@ -443,28 +436,23 @@
     expiryInterval = setInterval(update, 1000);
   }
 
-  let statusPollInterval = null;
-
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
     if (!codeKey) return;
-    async function poll() {
-      try {
-        const res = await checkCodeStatusFn({ codeKey });
-        const s = res.data;
-        if (!s.exists) { showRevoked('deleted'); return; }
-        if (s.status === 'disabled') { showRevoked('disabled'); return; }
-        if (s.status === 'expired') { showRevoked('expired'); return; }
-        if (s.expiresAt) startExpiryTicker(s.expiresAt);
-      } catch {}
-    }
-    poll();
-    statusPollInterval = setInterval(poll, 30000);
+    liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
+      if (!snap.exists) { showRevoked('deleted'); return; }
+      const data = snap.data();
+      if (data.status === 'disabled') { showRevoked('disabled'); return; }
+      if (data.expires_at) {
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) { showRevoked('expired'); return; }
+        startExpiryTicker(expiresAt);
+      }
+    });
   }
 
   function stopLiveListener() {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
   }
 
   function showRevoked(reason) {
@@ -514,17 +502,50 @@
     if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
-      const res = await verifyCodeFn({ code: codeKey, email, sessionId: getSessionId() });
-      const result = res.data;
-      if (!result.ok) {
-        if (!silent) showError(result.error || 'Verification failed.');
+      const snap = await getDoc(doc(db, 'codes', codeKey));
+      if (!snap.exists()) {
+        if (!silent) showError('Code not found.');
         return { ok: false };
       }
-      _setAccess(result.codeKey);
-      localStorage.setItem(KEY_CODE, result.codeKey);
-      localStorage.setItem('gv_tier', result.tier);
-      if (email) localStorage.setItem(KEY_EMAIL, email.trim().toLowerCase());
-      return { ok: true, codeKey: result.codeKey, expiresAt: result.expiresAt, tier: result.tier };
+      const data = snap.data();
+      if (data.status === 'disabled') {
+        if (!silent) showError('This code has been disabled.');
+        return { ok: false };
+      }
+      if (data.expires_at) {
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) {
+          if (!silent) showError('Code has expired.');
+          return { ok: false };
+        }
+      }
+      const usedSessions = data.used_sessions || [];
+      const sessionId = getSessionId();
+      const emailLower = (email || '').trim().toLowerCase();
+      if (data.max_devices && data.max_devices > 0 && usedSessions.length >= data.max_devices) {
+        if (!usedSessions.includes(sessionId) && !(data.used_emails || []).includes(emailLower)) {
+          if (!silent) showError('Max devices reached.');
+          return { ok: false };
+        }
+      }
+      const updates = {};
+      if (!usedSessions.includes(sessionId)) {
+        updates.used_sessions = arrayUnion(sessionId);
+      }
+      if (email && !(data.used_emails || []).includes(emailLower)) {
+        updates.used_emails = arrayUnion(emailLower);
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(doc(db, 'codes', codeKey), updates);
+      }
+      _setAccess(codeKey);
+      localStorage.setItem(KEY_CODE, codeKey);
+      localStorage.setItem('gv_tier', data.tier || 'member');
+      if (email) localStorage.setItem(KEY_EMAIL, emailLower);
+      const expiresAt = data.expires_at
+        ? (data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000)
+        : null;
+      return { ok: true, codeKey, expiresAt, tier: data.tier || 'member' };
     } catch (err) {
       if (!silent) showError('Verification failed. Please try again.');
       return { ok: false };
@@ -694,10 +715,10 @@
           g.membership && g.membership !== 'All') return false;
       return true;
     }));
-    // Fetch Firestore games via callable (no downloadUrl exposed)
+    // Fetch Firestore games directly
     try {
-      const res = await getGamesListFn();
-      const fsGames = (res.data?.games || []).filter(g => g.status !== 'hidden');
+      const snap = await getDocs(collection(db, 'games'));
+      const fsGames = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(g => g.status !== 'hidden');
       const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
       const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
       const allGames = [...fsGames, ...catalogOnly];
