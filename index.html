@@ -1174,8 +1174,8 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, onSnapshot, updateDoc, serverTimestamp,
-    collection, increment, query, orderBy, limit
+    getFirestore, doc, collection, onSnapshot, query, orderBy, limit,
+    getDoc, getDocs, updateDoc, arrayUnion
   } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
   // ===== EMAILJS CONFIG =====
@@ -1238,20 +1238,12 @@
   async function getSecureDownloadUrl(gameId) {
     if (_urlCache.has(gameId)) return _urlCache.get(gameId);
     try {
-      const snap = await getDoc(doc(db, 'games', gameId));
-      if (!snap.exists()) throw new Error('Game not found');
-      const data = snap.data();
-      const userTier = getTierFilter();
-      const membership = data.membership || 'All';
-      if (tierAllows(userTier, membership) &&
-          !(userTier === 'member' && data.releaseStatus && data.releaseStatus !== 'Full Release' &&
-            membership !== 'All')) {
-        if (data.downloadUrl && data.downloadUrl !== '#') {
-          _urlCache.set(gameId, data.downloadUrl);
-          return data.downloadUrl;
-        }
-      }
-      throw new Error('Access denied');
+      const docSnap = await getDoc(doc(db, 'games', gameId));
+      if (!docSnap.exists()) throw new Error('Not found');
+      const url = docSnap.data().downloadUrl;
+      if (!url) throw new Error('No URL');
+      _urlCache.set(gameId, url);
+      return url;
     } catch (err) {
       throw new Error('Access denied');
     }
@@ -1321,19 +1313,7 @@
   }
 
   
-  let gamesUnsubscribe = null;
 
-  function buildMergedGames(firestoreDocs) {
-    // Firestore games (active + coming-soon for featured)
-    const fsGames = firestoreDocs.map(d => { const data = d.data(); return { ...data, id: d.id, _source: 'firestore', featured: data.featured === true || data.featured === 'Yes' || data.featured === 'true' ? true : false }; });
-    const fsNames = new Set(fsGames.map(g => g.name?.toLowerCase()));
-    // Catalog games not already in Firestore
-    const catalogGames = (window.GAMES_CATALOG || []).map(g => ({
-      ...g, id: String(g.id), status: g.status || 'active',
-      downloads: g.downloads || 0, featured: g.featured || false, _source: 'catalog'
-    })).filter(g => !fsNames.has(g.name?.toLowerCase()));
-    return [...fsGames, ...catalogGames];
-  }
 
   function renderCatTabs(cats) {
     const container = document.getElementById('catTabs');
@@ -1404,36 +1384,19 @@
     allGames = catalogGames.filter(g => !g.status || g.status === 'active');
     try { applyGames(catalogGames); } catch(e) { console.error('applyGames error', e); }
 
-    // Stop any previous listener
-    if (gamesUnsubscribe) { gamesUnsubscribe(); gamesUnsubscribe = null; }
-
-    // Real-time Firestore listener — merges on every admin change
-    let fsTimer;
-    let _fsFirst = true;
-    try {
-      gamesUnsubscribe = onSnapshot(
-        collection(db, 'games'),
-        snap => {
-          try {
-            const merged = buildMergedGames(snap.docs);
-            if (_fsFirst) { _fsFirst = false; applyGames(merged); return; }
-            clearTimeout(fsTimer);
-            fsTimer = setTimeout(() => { applyGames(merged); }, 300);
-          } catch(e) {
-            console.error('Firestore apply error', e);
-            if (allGames.length) renderGames();
-          }
-        },
-        err => {
-          console.error('Firestore listener error', err);
-          if (window.GAMES_CATALOG?.length && !allGames.length) {
-            setTimeout(() => { if (!allGames.length) loadGamesFromCatalog(); }, 2000);
-          }
-        }
-      );
-    } catch(e) {
-      console.error('Firestore setup error', e);
-    }
+    // Fetch Firestore games directly
+    getDocs(collection(db, 'games')).then(snap => {
+      const fsGames = snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(g => g.status !== 'hidden');
+      const fsNames = new Set(fsGames.map(g => g.name?.toLowerCase()));
+      const catalogOnly = catalogGames.filter(g => !fsNames.has(g.name?.toLowerCase()));
+      const merged = [...fsGames, ...catalogOnly];
+      applyGames(merged);
+    }).catch(() => {
+      // Fall back to catalog-only if Firestore fails
+      if (!allGames.length && window.GAMES_CATALOG?.length) {
+        setTimeout(() => { if (!allGames.length) loadGamesFromCatalog(); }, 3000);
+      }
+    });
   }
 
   
@@ -1613,15 +1576,13 @@
     }
     showToast('⬇ Download starting...', 1600);
     window.open(url, '_blank', 'noopener');
-    try {
-      await updateDoc(doc(db, 'games', gameId), { downloads: increment(1) });
-      const game = allGames.find(g => g.id === gameId);
-      if (game) {
-        game.downloads = (game.downloads || 0) + 1;
-        const badge = document.querySelector(`.game-card[data-game-id="${gameId}"] .dl-badge`);
-        if (badge) badge.textContent = `⬇ ${game.downloads.toLocaleString()}`;
-      }
-    } catch (e) {  }
+    // Increment local download counter
+    const game = allGames.find(g => g.id === gameId);
+    if (game) {
+      game.downloads = (game.downloads || 0) + 1;
+      const badge = document.querySelector(`.game-card[data-game-id="${gameId}"] .dl-badge`);
+      if (badge) badge.textContent = `⬇ ${game.downloads.toLocaleString()}`;
+    }
   }
 
   // Load more button
@@ -1741,6 +1702,7 @@
     showTierBadge(tier);
     onVerificationComplete();
     startVipNotifications();
+    if (tier === 'vip' && typeof initChatBot === 'function') initChatBot();
   }
 
   const TIER_STYLES = {
@@ -1761,7 +1723,6 @@
 
   function requireCode() {
     stopLiveListener(); stopExpiryTicker();
-    if (gamesUnsubscribe) { gamesUnsubscribe(); gamesUnsubscribe = null; }
     document.getElementById('protected-content').style.display = 'none';
     document.getElementById('revokedOverlay').classList.remove('show');
     document.getElementById('accessModal').style.display = 'flex';
@@ -1771,7 +1732,6 @@
 
   function showRevoked(reason = 'disabled') {
     stopLiveListener(); stopExpiryTicker(); revokeLocalAccess();
-    if (gamesUnsubscribe) { gamesUnsubscribe(); gamesUnsubscribe = null; }
     document.getElementById('protected-content').style.display = 'none';
     document.getElementById('accessModal').style.display = 'none';
     const titles = { disabled:'Access Paused', deleted:'Code Not Found', expired:'Access Expired' };
@@ -1830,14 +1790,15 @@
 
   function startLiveListener(codeKey) {
     stopLiveListener();
+    if (!codeKey) return;
     liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
-      if (!snap.exists()) { showRevoked('deleted'); return; }
+      if (!snap.exists) { showRevoked('deleted'); return; }
       const data = snap.data();
       if (data.status === 'disabled') { showRevoked('disabled'); return; }
       if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { showRevoked('expired'); return; }
-        startExpiryTicker(expiry.getTime());
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) { showRevoked('expired'); return; }
+        startExpiryTicker(expiresAt);
       }
     });
   }
@@ -1852,76 +1813,55 @@
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
       const snap = await getDoc(doc(db, 'codes', codeKey));
-      if (!snap.exists()) { if (!silent) showError('Code not found.'); revokeLocalAccess(); return { ok: false }; }
+      if (!snap.exists()) {
+        if (!silent) showError('Code not found.');
+        revokeLocalAccess();
+        return { ok: false, error: 'not found' };
+      }
       const data = snap.data();
-      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
-      let expiresAt = null;
+      if (data.status === 'disabled') {
+        if (!silent) showError('This code has been disabled.');
+        return { ok: false, error: 'disabled' };
+      }
       if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
-        expiresAt = expiry.getTime();
-        if (!silent) document.getElementById('expiryBadge').classList.add('show');
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) {
+          if (!silent) showError('Code has expired.');
+          return { ok: false, error: 'expired' };
+        }
       }
-      const sessionId = getSessionId();
       const usedSessions = data.used_sessions || [];
-      const usedEmails = data.used_emails || [];
-      const maxDevices = data.max_devices || 1;
-      const isLifetime = maxDevices >= 999 || maxDevices === -1;
-
-      // Determine tier
-      let tier = 'elite';
-      if (isLifetime) tier = 'vip';
-      else if (maxDevices <= 1) tier = 'member';
-
-      // Email limit check — skip for lifetime
-      const normalEmail = email.trim().toLowerCase();
-      if (!isLifetime) {
-        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
-          if (!silent) showError('Please enter a valid email address.');
-          return { ok: false };
-        }
-        if (!usedEmails.includes(normalEmail)) {
-          if (usedEmails.length >= maxDevices) {
-            if (!silent) showError('Email limit reached. This code is used by too many people.');
-            return { ok: false };
-          }
-          usedEmails.push(normalEmail);
+      const sessionId = getSessionId();
+      const emailLower = (email || '').trim().toLowerCase();
+      if (data.max_devices && data.max_devices > 0 && usedSessions.length >= data.max_devices) {
+        if (!usedSessions.includes(sessionId) && !(data.used_emails || []).includes(emailLower)) {
+          if (!silent) showError('Max devices reached.');
+          return { ok: false, error: 'max_devices' };
         }
       }
-
-      // Device/session check
-      if (usedSessions.includes(sessionId)) {
-        // Already verified on this device — allow
-      } else if (isLifetime) {
-        usedSessions.push(sessionId);
-      } else if (usedSessions.length >= maxDevices) {
-        if (!silent) showError('Device limit reached. Maximum ' + maxDevices + ' device' + (maxDevices > 1 ? 's' : '') + ' allowed.');
-        return { ok: false };
-      } else {
-        usedSessions.push(sessionId);
+      const updates = {};
+      if (!usedSessions.includes(sessionId)) {
+        updates.used_sessions = arrayUnion(sessionId);
       }
-
-      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
-      if (data.status !== 'used') {
-        updateData.status = 'used';
-        updateData.used_at = serverTimestamp();
+      if (email && !(data.used_emails || []).includes(emailLower)) {
+        updates.used_emails = arrayUnion(emailLower);
       }
-      await updateDoc(doc(db, 'codes', codeKey), updateData);
-
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(doc(db, 'codes', codeKey), updates);
+      }
+      if (!silent && data.expires_at) document.getElementById('expiryBadge').classList.add('show');
       _setAccess(codeKey);
       localStorage.setItem(KEY_CODE, codeKey);
-      localStorage.setItem('gv_tier', tier);
-      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
-      return { ok: true, codeKey, expiresAt, tier };
+      localStorage.setItem('gv_tier', data.tier || 'member');
+      if (email) localStorage.setItem(KEY_EMAIL, emailLower);
+      const expiresAt = data.expires_at
+        ? (data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000)
+        : null;
+      return { ok: true, codeKey, expiresAt, tier: data.tier || 'member' };
     } catch (err) {
-  console.error("❌ VERIFY ERROR:", err);
-
-  if (!silent) {
-    showError(err.code + " | " + err.message);
-  }
-
-  return { ok: false };
-}
+      if (!silent) showError('Verification failed. Please try again.');
+      return { ok: false };
+    }
   }
 
   async function handleSubmit() {
@@ -2266,10 +2206,7 @@
 </script>
 
 <script>
-(function () {
-
-  var isVIP = (localStorage.getItem("gv_tier") || "").toLowerCase() === "vip";
-  if (!isVIP) return;
+function initChatBot() {
   if (window.__GV_CHAT_LOADED__) return;
   window.__GV_CHAT_LOADED__ = true;
 
@@ -2586,7 +2523,7 @@
     if (box.classList.contains('open') && !box.contains(e.target) && e.target !== btn) closePanel();
   });
 
-})();
+}
 </script>
 
 </body>
