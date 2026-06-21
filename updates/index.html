@@ -319,9 +319,8 @@
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
   import {
-    getFirestore, doc, getDoc, onSnapshot, updateDoc, serverTimestamp,
-    collection, increment
-  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    getFunctions, httpsCallable
+  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -333,7 +332,11 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const db = getFirestore(app);
+  const functions_ = getFunctions(app);
+  const verifyCodeFn = httpsCallable(functions_, 'verifyAccessCode');
+  const getGamesListFn = httpsCallable(functions_, 'getGamesList');
+  const getGameDownloadUrlFn = httpsCallable(functions_, 'getGameDownloadUrl');
+  const checkCodeStatusFn = httpsCallable(functions_, 'checkCodeStatus');
 
   const KEY_ACCESS = 'gv_access';
   const KEY_CODE = 'gv_code';
@@ -365,19 +368,12 @@
 
   async function getSecureDownloadUrl(gameId) {
     if (_urlCache.has(gameId)) return _urlCache.get(gameId);
+    const codeKey = localStorage.getItem(KEY_CODE);
     try {
-      const snap = await getDoc(doc(db, 'games', gameId));
-      if (!snap.exists()) throw new Error('Game not found');
-      const data = snap.data();
-      const userTier = getTierFilter();
-      const membership = data.membership || 'All';
-      if (tierAllows(userTier, membership) &&
-          !(userTier === 'member' && data.releaseStatus && data.releaseStatus !== 'Full Release' &&
-            membership !== 'All')) {
-        if (data.downloadUrl && data.downloadUrl !== '#') {
-          _urlCache.set(gameId, data.downloadUrl);
-          return data.downloadUrl;
-        }
+      const result = await getGameDownloadUrlFn({ gameId, codeKey });
+      if (result.data?.ok && result.data?.downloadUrl) {
+        _urlCache.set(gameId, result.data.downloadUrl);
+        return result.data.downloadUrl;
       }
       throw new Error('Access denied');
     } catch (err) {
@@ -447,22 +443,28 @@
     expiryInterval = setInterval(update, 1000);
   }
 
+  let statusPollInterval = null;
+
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
-      if (!snap.exists()) { showRevoked('deleted'); return; }
-      const data = snap.data();
-      if (data.status === 'disabled') { showRevoked('disabled'); return; }
-      if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { showRevoked('expired'); return; }
-        startExpiryTicker(expiry.getTime());
-      }
-    });
+    if (!codeKey) return;
+    async function poll() {
+      try {
+        const res = await checkCodeStatusFn({ codeKey });
+        const s = res.data;
+        if (!s.exists) { showRevoked('deleted'); return; }
+        if (s.status === 'disabled') { showRevoked('disabled'); return; }
+        if (s.status === 'expired') { showRevoked('expired'); return; }
+        if (s.expiresAt) startExpiryTicker(s.expiresAt);
+      } catch {}
+    }
+    poll();
+    statusPollInterval = setInterval(poll, 30000);
   }
 
   function stopLiveListener() {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
+    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
   }
 
   function showRevoked(reason) {
@@ -512,63 +514,19 @@
     if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
-      const snap = await getDoc(doc(db, 'codes', codeKey));
-      if (!snap.exists()) { if (!silent) showError('Code not found.'); return { ok: false }; }
-      const data = snap.data();
-      if (data.status === 'disabled') { if (!silent) showError('Disabled.'); return { ok: false }; }
-      let expiresAt = null;
-      if (data.expires_at) {
-        const expiry = data.expires_at.toDate ? data.expires_at.toDate() : new Date(data.expires_at);
-        if (new Date() > expiry) { if (!silent) showError('Expired.'); return { ok: false }; }
-        expiresAt = expiry.getTime();
+      const res = await verifyCodeFn({ code: codeKey, email, sessionId: getSessionId() });
+      const result = res.data;
+      if (!result.ok) {
+        if (!silent) showError(result.error || 'Verification failed.');
+        return { ok: false };
       }
-      const sessionId = getSessionId();
-      const usedSessions = data.used_sessions || [];
-      const usedEmails = data.used_emails || [];
-      const maxDevices = data.max_devices || 1;
-      const isLifetime = maxDevices >= 999 || maxDevices === -1;
-
-      let tier = 'elite';
-      if (isLifetime) tier = 'vip';
-      else if (maxDevices <= 1) tier = 'member';
-
-      const normalEmail = email.trim().toLowerCase();
-      if (!isLifetime) {
-        if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
-          if (!silent) showError('Please enter a valid email address.');
-          return { ok: false };
-        }
-        if (!usedEmails.includes(normalEmail)) {
-          if (usedEmails.length >= maxDevices) {
-            if (!silent) showError('Email limit reached.');
-            return { ok: false };
-          }
-          usedEmails.push(normalEmail);
-        }
-      }
-
-      if (!usedSessions.includes(sessionId)) {
-        if (!isLifetime && usedSessions.length >= maxDevices) {
-          if (!silent) showError('Device limit reached.');
-          return { ok: false };
-        }
-        usedSessions.push(sessionId);
-      }
-
-      const updateData = { used_sessions: usedSessions, used_emails: usedEmails };
-      if (data.status !== 'used') {
-        updateData.status = 'used';
-        updateData.used_at = serverTimestamp();
-      }
-      await updateDoc(doc(db, 'codes', codeKey), updateData);
-
-      _setAccess(codeKey);
-      localStorage.setItem(KEY_CODE, codeKey);
-      localStorage.setItem('gv_tier', tier);
-      if (normalEmail) localStorage.setItem(KEY_EMAIL, normalEmail);
-      return { ok: true, codeKey, expiresAt, tier };
+      _setAccess(result.codeKey);
+      localStorage.setItem(KEY_CODE, result.codeKey);
+      localStorage.setItem('gv_tier', result.tier);
+      if (email) localStorage.setItem(KEY_EMAIL, email.trim().toLowerCase());
+      return { ok: true, codeKey: result.codeKey, expiresAt: result.expiresAt, tier: result.tier };
     } catch (err) {
-      if (!silent) showError(err.message || 'Verification failed.');
+      if (!silent) showError('Verification failed. Please try again.');
       return { ok: false };
     }
   }
@@ -736,24 +694,20 @@
           g.membership && g.membership !== 'All') return false;
       return true;
     }));
-    if (!db) return;
+    // Fetch Firestore games via callable (no downloadUrl exposed)
     try {
-      onSnapshot(collection(db, 'games'),
-        (snap) => {
-          const fsGames = snap.docs.map(d => ({ ...d.data(), id: d.id, _source: 'firestore' })).filter(g => g.status !== 'hidden');
-          const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
-          const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
-          const allGames = [...fsGames, ...catalogOnly];
-          const ft = getTierFilter();
-          render(allGames.filter(g => {
-            if (!tierAllows(ft, g.membership)) return false;
-            if (ft === 'member' && g.releaseStatus && g.releaseStatus !== 'Full Release' &&
-                g.membership && g.membership !== 'All') return false;
-            return true;
-          }));
-        },
-        () => {}
-      );
+      const res = await getGamesListFn();
+      const fsGames = (res.data?.games || []).filter(g => g.status !== 'hidden');
+      const fsNames = new Set(fsGames.map(g => g.name && g.name.toLowerCase()));
+      const catalogOnly = catalog.filter(g => !fsNames.has(g.name && g.name.toLowerCase()));
+      const allGames = [...fsGames, ...catalogOnly];
+      const ft = getTierFilter();
+      render(allGames.filter(g => {
+        if (!tierAllows(ft, g.membership)) return false;
+        if (ft === 'member' && g.releaseStatus && g.releaseStatus !== 'Full Release' &&
+            g.membership && g.membership !== 'All') return false;
+        return true;
+      }));
     } catch (_) {}
   }
 
