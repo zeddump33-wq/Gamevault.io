@@ -1,2510 +1,893 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <meta http-equiv="X-Frame-Options" content="DENY" />
-  <meta http-equiv="X-Content-Type-Options" content="nosniff" />
-  <meta http-equiv="Referrer-Policy" content="strict-origin-when-cross-origin" />
-  <title>GameVault · Secure Game Downloads</title>
-  <link rel="icon" type="image/png" href="images/Logo.jpg" />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/style.css" />
-  <script>window.GAMES_CATALOG = [];</script>
-  <script>
-    (function(){var k=function(e){if(e.target==0||e.keyCode==123||(e.ctrlKey&&e.shiftKey&&(e.keyCode==73||e.keyCode==74||e.keyCode==67))||(e.ctrlKey&&e.keyCode==85)||(e.ctrlKey&&e.keyCode==83)){e.preventDefault();return false}};document.addEventListener('contextmenu',function(e){e.preventDefault()});document.addEventListener('keydown',k);var e=new Date();setInterval(function(){var d=new Date();if(d-e>200)try{debugger}catch(err){}e=d},100)})();
-  </script>
-  <style>
-    #loadingOverlay {
-      position: fixed; inset: 0; z-index: 99999;
-      background: radial-gradient(ellipse at center, #0a0d16 0%, #05070c 100%);
-      display: flex; align-items: center; justify-content: center;
-      flex-direction: column; gap: 20px;
-      transition: opacity 0.6s ease, visibility 0.6s ease;
-      overflow: hidden;
-    }
-    #loadingOverlay.hide { opacity: 0; visibility: hidden; pointer-events: none; }
-
-    .load-bg-canvas { position: absolute; inset: 0; pointer-events: none; z-index: 0; }
-    .load-scanlines {
-      position: absolute; inset: 0; pointer-events: none; z-index: 1;
-      opacity: 0.5;
-    }
-
-    .load-content { position: relative; z-index: 2; display: flex; flex-direction: column; align-items: center; gap: 20px; text-align: center; will-change: transform; }
-
-    .load-logo { font-size: 32px; font-weight: 900; letter-spacing: 6px; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; opacity: 0; animation: loadFadeIn 0.8s ease 0.2s forwards; }
-    .load-logo img { height: 48px; width: auto; display: block; -webkit-text-fill-color: initial; }
-
-    .load-text-wrap { position: relative; height: 22px; width: 340px; max-width: 80vw; }
-    .load-text {
-      position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
-      font-size: 13px; font-weight: 600; letter-spacing: 3px; text-transform: uppercase; color: #8892b0;
-      transition: opacity 0.5s ease;
-    }
-    .load-text.hidden { opacity: 0; }
-
-    .load-bar-wrap { width: 260px; height: 3px; background: rgba(255,255,255,0.06); border-radius: 99px; overflow: hidden; }
-    .load-bar { height: 100%; width: 0%; background: linear-gradient(90deg, #3b82f6, #8b5cf6); border-radius: 99px; transition: width 0.6s cubic-bezier(0.22,1,0.36,1); }
-
-    .load-tier-container { position: relative; width: 360px; height: 170px; display: flex; align-items: center; justify-content: center; }
-    .load-tier-card {
-      position: absolute; display: flex; flex-direction: column; align-items: center; gap: 10px;
-      opacity: 0; transform: scale(0.9) translateY(10px); transition: opacity 0.6s ease, transform 0.6s cubic-bezier(0.22,1,0.36,1);
-      padding: 24px 52px; border-radius: 20px;
-      will-change: transform, opacity;
-    }
-    .load-tier-card.show { opacity: 1; transform: scale(1) translateY(0); }
-    .load-tier-card.tier-member { background: rgba(59,130,246,0.08); border: 1px solid rgba(59,130,246,0.2); box-shadow: 0 0 30px rgba(59,130,246,0.08); }
-    .load-tier-card.tier-elite { background: rgba(59,130,246,0.12); border: 1px solid rgba(59,130,246,0.35); box-shadow: 0 0 40px rgba(59,130,246,0.12); }
-    .load-tier-card.tier-vip { background: rgba(245,158,11,0.08); border: 1px solid rgba(245,158,11,0.3); box-shadow: 0 0 50px rgba(245,158,11,0.12); }
-    .load-tier-card.tier-welcome { background: rgba(59,130,246,0.06); border: 1px solid rgba(59,130,246,0.15); box-shadow: 0 0 40px rgba(59,130,246,0.06); padding: 28px 48px; gap: 14px; }
-
-    .tier-badge {
-      font-size: 30px; font-weight: 900; letter-spacing: 5px;
-    }
-    .tier-badge.member { color: #3b82f6; text-shadow: 0 0 30px rgba(59,130,246,0.3); }
-    .tier-badge.elite { color: #60a5fa; text-shadow: 0 0 30px rgba(59,130,246,0.4); }
-    .tier-badge.vip { background: linear-gradient(135deg, #f59e0b, #ef4444, #f59e0b); background-size: 200% 200%; -webkit-background-clip: text; -webkit-text-fill-color: transparent; animation: vipGlow 2s ease infinite; }
-    @keyframes vipGlow { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
-
-    .tier-crown { font-size: 40px; animation: crownPop 0.5s cubic-bezier(0.22,1,0.36,1); }
-    @keyframes crownPop { 0% { transform: scale(0) rotate(-20deg); opacity: 0; } 100% { transform: scale(1) rotate(0); opacity: 1; } }
-
-    .tier-sub { font-size: 11px; font-weight: 600; letter-spacing: 2px; text-transform: uppercase; color: #6f7893; }
-    .tier-sub.vip { color: #f59e0b; }
-
-    .load-welcome-icon { width: 52px; height: 52px; border-radius: 50%; object-fit: cover; animation: loadIconIn 0.6s cubic-bezier(0.22,1,0.36,1); }
-    @keyframes loadIconIn { 0% { transform: scale(0); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-    .load-final-title { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: 1px; }
-    .load-final-sub { font-size: 11px; font-weight: 600; color: #3b82f6; letter-spacing: 3px; text-transform: uppercase; }
-
-    .load-progress-dot { width: 6px; height: 6px; border-radius: 50%; background: #3b82f6; display: inline-block; margin: 0 4px; opacity: 0.15; transition: opacity 0.4s ease; }
-    .load-progress-dot.active { opacity: 1; box-shadow: 0 0 10px rgba(59,130,246,0.5); }
-
-    @keyframes loadFadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-    @media (max-width: 480px) {
-      .load-tier-container { width: 280px; height: 140px; }
-      .load-tier-card { padding: 16px 28px; }
-      .tier-badge { font-size: 24px; }
-      .load-logo { font-size: 24px; }
-      .load-logo img { height: 40px; }
-      .load-final-title { font-size: 18px; }
-      .load-bar-wrap { width: 200px; }
-    }
-
-    #protected-content { display: none; }
-    #accessModal { display: none; }
-
-    
-    #revokedOverlay {
-      display: none; position: fixed; inset: 0;
-      background: rgba(5,7,12,0.97); backdrop-filter: blur(16px);
-      z-index: 20000; align-items: center; justify-content: center;
-    }
-    #revokedOverlay.show { display: flex; }
-    .revoked-card {
-      background: rgba(18,22,30,0.92); border-radius: 36px;
-      border: 1px solid rgba(255,100,100,0.3); padding: 40px 36px;
-      max-width: 420px; text-align: center;
-    }
-    .revoked-icon { font-size: 52px; margin-bottom: 16px; }
-    .revoked-card h2 {
-      font-size: 24px; font-weight: 800;
-      background: linear-gradient(120deg, #ff8a7a, #ff4545);
-      background-clip: text; -webkit-background-clip: text; color: transparent;
-    }
-    .revoked-card p { color: #b9c3e0; font-size: 14px; margin: 16px 0; }
-
-    
-    #expiryBadge { display: none; margin: 12px auto 0; background: #1e2430; border-radius: 30px; padding: 7px 16px; font-size: 12px; color: #e7b42c; width: fit-content; }
-    #expiryBadge.show { display: block; }
-    #expiryTicker { display: none; position: fixed; bottom: 20px; right: 20px; background: rgba(18,22,30,0.92); backdrop-filter: blur(8px); border: 1px solid #2a2f3c; border-radius: 40px; padding: 8px 18px; font-size: 12px; color: #e7b42c; z-index: 5000; }
-    #expiryTicker.show { display: block; }
-    #expiryTicker.urgent { border-color: #c24a4a; color: #ff8a7a; animation: pulse 1s infinite; }
-    @keyframes pulse { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
-
-    
-    #featuredSection { display: none; }
-    #featuredSection.show { display: block; }
-    #trendingSection { display: none; }
-    #trendingSection.show { display: block; }
-
-    .section-link {
-      font-family: 'Outfit', 'Inter', system-ui, sans-serif;
-      font-size: 13px; font-weight: 700; color: #2dd4bf;
-      text-decoration: none; display: inline-flex; align-items: center; gap: 4px;
-      transition: all 0.2s ease;
-      text-shadow: 0 0 10px rgba(45, 212, 191, 0.1);
-    }
-    .section-link:hover {
-      color: #3b82f6;
-      transform: translateX(3px);
-    }
-
-    .games-section .section-title {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      margin-bottom: 24px;
-      border-bottom: 1px solid rgba(255, 255, 255, 0.03);
-      padding-bottom: 12px;
-    }
-    .games-section .section-title h2 {
-      font-family: 'Outfit', 'Inter', system-ui, sans-serif;
-      font-size: 24px;
-      font-weight: 900;
-      letter-spacing: -0.03em;
-      color: #fff;
-      position: relative;
-      padding-left: 14px;
-    }
-    .games-section .section-title h2::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 15%;
-      bottom: 15%;
-      width: 4px;
-      border-radius: 4px;
-      background: linear-gradient(to bottom, #2dd4bf, #3b82f6);
-      box-shadow: 0 0 8px rgba(45, 212, 191, 0.4);
-    }
-
-    .typing-wrap { display: inline-flex; align-items: center; }
-    .typing-text { color: #3b82f6; }
-    .typing-cursor {
-      display: inline-block;
-      width: 3px;
-      height: 1.1em;
-      background: var(--color-primary);
-      margin-left: 3px;
-      animation: blink 0.7s step-end infinite;
-      vertical-align: text-bottom;
-      border-radius: 1px;
-    }
-    @keyframes blink {
-      0%, 100% { opacity: 1; }
-      50% { opacity: 0; }
-    }
-
-    .scroll-row {
-      display: flex; gap: 12px; overflow-x: auto; padding: 4px 0 12px;
-      scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
-      scrollbar-width: none;
-    }
-    .scroll-row::-webkit-scrollbar { display: none; }
-    .scroll-row .scroll-card {
-      flex: 0 0 140px; scroll-snap-align: start;
-      position: relative; border-radius: 12px; overflow: hidden;
-      cursor: pointer; border: 1px solid rgba(45,212,191,0.15);
-      transition: transform 0.2s, box-shadow 0.2s;
-    }
-    .scroll-row .scroll-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 28px rgba(45,212,191,0.12);
-      border-color: rgba(45,212,191,0.3);
-    }
-    .scroll-row .scroll-card img {
-      width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;
-    }
-    .scroll-card-info {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: linear-gradient(transparent, rgba(5,7,12,0.95));
-      padding: 24px 10px 10px;
-    }
-    .scroll-card-name { font-size: 12px; font-weight: 700; color: #e2e8f0; }
-    .scroll-card-dl {
-      font-size: 10px; color: rgba(45,212,191,0.6); margin-top: 2px;
-    }
-    .scroll-card-badge {
-      position: absolute; top: 6px; right: 6px;
-      font-size: 10px; font-weight: 700; color: #f59e0b;
-      text-shadow: 0 1px 4px rgba(0,0,0,0.6);
-    }
-
-    .feat-carousel {
-      position: relative; overflow: hidden;
-      background: #070a14; border-radius: 20px;
-      height: 540px; isolation: isolate;
-    }
-    .feat-carousel::before {
-      content: '';
-      position: absolute; inset: -40px; z-index: 0;
-      background: radial-gradient(ellipse at var(--fp-x,50%) var(--fp-y,50%), rgba(45,212,191,0.04) 0%, transparent 60%);
-      transition: background 1.2s cubic-bezier(0.25,0.1,0.25,1);
-      pointer-events: none;
-    }
-    .feat-viewport {
-      position: absolute; inset: 0; z-index: 1; overflow: hidden;
-      touch-action: pan-y;
-      pointer-events: none;
-    }
-    .feat-track {
-      display: flex; height: 100%;
-      will-change: transform;
-      pointer-events: auto;
-    }
-    .feat-slide {
-      flex: 0 0 100%; height: 100%;
-      display: grid; grid-template-columns: repeat(4, 1fr);
-      grid-template-rows: 1fr; gap: 14px;
-      padding: 24px; box-sizing: border-box;
-      position: relative;
-    }
-    .feat-slide::after {
-      content: '';
-      position: absolute; inset: 0; z-index: 0;
-      background: radial-gradient(ellipse at center, transparent 40%, rgba(5,7,12,0.4) 100%);
-      pointer-events: none;
-    }
-    .feat-card {
-      position: relative; border-radius: 14px; overflow: hidden;
-      background: #0f1420; cursor: pointer;
-      border: 1px solid rgba(45,212,191,0.06);
-      display: flex; flex-direction: column;
-      transition: box-shadow 0.4s ease, border-color 0.4s ease;
-    }
-    .feat-card:hover {
-      transform: translateY(-6px) scale(1.02);
-      box-shadow: 0 16px 48px rgba(0,0,0,0.5), 0 0 24px rgba(45,212,191,0.06);
-      border-color: rgba(45,212,191,0.25);
-    }
-    .feat-card-img {
-      position: relative; flex: 1; overflow: hidden; min-height: 0;
-    }
-    .feat-card-img img {
-      width: 100%; height: 100%; object-fit: cover; display: block;
-      transition: transform 0.6s cubic-bezier(0.25,0.1,0.25,1);
-      will-change: transform;
-    }
-    .feat-card:hover .feat-card-img img { transform: scale(1.12); }
-    .feat-card-overlay {
-      position: absolute; inset: 0; pointer-events: none;
-      background: linear-gradient(to top, rgba(5,7,12,0.9) 0%, rgba(5,7,12,0.1) 50%, transparent 100%);
-    }
-    .feat-card-body {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      padding: 20px 14px 14px; z-index: 2;
-    }
-    .feat-card-badge {
-      display: inline-block; font-size: 10px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.08em;
-      padding: 3px 10px; border-radius: 100px;
-      background: rgba(45,212,191,0.12); color: #2dd4bf;
-      margin-bottom: 6px;
-    }
-    .feat-card-title {
-      font-size: 16px; font-weight: 800; color: #fff;
-      line-height: 1.2; margin-bottom: 3px;
-      text-shadow: 0 2px 8px rgba(0,0,0,0.5);
-    }
-    .feat-card-meta {
-      font-size: 11px; color: rgba(255,255,255,0.35);
-      margin-bottom: 8px;
-    }
-    .feat-arrow {
-      position: absolute; top: 50%; z-index: 10;
-      transform: translateY(-50%);
-      width: 44px; height: 44px; border-radius: 100px;
-      background: rgba(5,7,12,0.6); backdrop-filter: blur(16px);
-      border: 1px solid rgba(255,255,255,0.08);
-      color: #fff; font-size: 22px; cursor: pointer;
-      display: flex; align-items: center; justify-content: center;
-      transition: all 0.3s cubic-bezier(0.25,0.1,0.25,1); padding: 0; line-height: 1;
-      opacity: 1;
-    }
-    .feat-arrow:hover { background: rgba(5,7,12,0.8); border-color: rgba(45,212,191,0.4); color: #2dd4bf; transform: translateY(-50%) scale(1.1); box-shadow: 0 0 20px rgba(45,212,191,0.15); }
-    .feat-prev { left: 16px; }
-    .feat-next { right: 16px; }
-    .feat-progress {
-      position: absolute; bottom: 0; left: 0; right: 0; z-index: 10;
-      height: 3px; background: rgba(255,255,255,0.03);
-    }
-    .feat-progress span {
-      display: block; height: 100%; width: 0%;
-      background: linear-gradient(90deg, #2dd4bf, #3b82f6, #8b5cf6);
-      background-size: 200% 100%;
-      animation: progShift 3s linear infinite;
-      transition: width 0.1s linear;
-    }
-    @keyframes progShift { 0% { background-position: 0% 0%; } 100% { background-position: 200% 0%; } }
-    .feat-dots {
-      position: absolute; bottom: 50px; left: 50%; z-index: 10;
-      transform: translateX(-50%); display: flex; gap: 8px;
-    }
-    .feat-dot {
-      width: 8px; height: 8px; border-radius: 50%;
-      background: rgba(255,255,255,0.15); border: none;
-      cursor: pointer; transition: all 0.3s ease; padding: 0;
-      position: relative;
-    }
-    .feat-dot::after {
-      content: '';
-      position: absolute; inset: -4px; border-radius: 50%;
-      border: 1px solid transparent;
-      transition: border-color 0.3s ease;
-    }
-    .feat-dot:hover::after { border-color: rgba(45,212,191,0.3); }
-    .feat-dot.active { background: #2dd4bf; box-shadow: 0 0 14px rgba(45,212,191,0.4); width: 24px; border-radius: 4px; }
-    .feat-thumbs {
-      position: absolute; bottom: 10px; left: 50%; z-index: 10;
-      transform: translateX(-50%);
-      display: flex; gap: 6px;
-    }
-    .feat-thumb {
-      width: 40px; height: 52px; border-radius: 6px; overflow: hidden;
-      cursor: pointer; border: 2px solid rgba(255,255,255,0.06);
-      transition: all 0.3s cubic-bezier(0.25,0.1,0.25,1);
-      flex-shrink: 0; padding: 0; background: #0f1420;
-      position: relative;
-    }
-    .feat-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform 0.4s ease; }
-    .feat-thumb:hover { border-color: rgba(45,212,191,0.3); transform: translateY(-2px) scale(1.05); }
-    .feat-thumb:hover img { transform: scale(1.1); }
-    .feat-thumb.active { border-color: #2dd4bf; box-shadow: 0 0 12px rgba(45,212,191,0.2); transform: translateY(-2px); }
-    .feat-skeleton {
-      position: absolute; inset: 0; z-index: 5;
-      background: #0f1420;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .feat-skeleton::after {
-      content: ''; width: 40px; height: 40px;
-      border: 3px solid rgba(45,212,191,0.08);
-      border-top-color: #2dd4bf;
-      border-radius: 50%; animation: featSpin 0.7s linear infinite;
-    }
-    @keyframes featSpin { to { transform: rotate(360deg); } }
-    @media (max-width: 900px) {
-      .feat-carousel { height: 460px; }
-      .feat-slide { grid-template-columns: repeat(2, 1fr); grid-template-rows: 1fr 1fr; gap: 10px; padding: 16px; }
-      .feat-card-title { font-size: 13px; }
-      .feat-card-body { padding: 14px 12px 12px; }
-      .feat-thumb { width: 34px; height: 44px; }
-    }
-    @media (max-width: 640px) {
-      .feat-carousel { height: auto; min-height: 560px; border-radius: 12px; }
-      .feat-slide { grid-template-columns: repeat(2, 1fr); grid-template-rows: 1fr 1fr; gap: 8px; padding: 12px; }
-      .feat-card { min-height: 200px; }
-      .feat-card-title { font-size: 12px; }
-      .feat-card-badge { font-size: 9px; padding: 2px 8px; }
-      .feat-card-meta { font-size: 10px; }
-      .feat-arrow { width: 34px; height: 34px; font-size: 18px; opacity: 1; }
-      .feat-prev { left: 6px; }
-      .feat-next { right: 6px; }
-      .feat-dots { bottom: 44px; }
-      .feat-thumb { width: 28px; height: 38px; }
-      .feat-thumbs { gap: 4px; }
-    }
-
-
-    #pg-home { display: block; }
-    .pg-loading { display: flex; align-items: center; justify-content: center; min-height: 400px; color: #8892b0; font-size: 14px; gap: 10px; }
-    .pg-loading::after { content: ''; width: 20px; height: 20px; border: 2px solid rgba(45,212,191,0.15); border-top-color: #2dd4bf; border-radius: 50%; animation: featSpin 0.7s linear infinite; }
-
-    .trending-card {
-      flex: 0 0 155px; scroll-snap-align: start;
-      position: relative; border-radius: 10px; overflow: hidden;
-      cursor: pointer; background: #121624;
-      transition: transform 0.25s ease, box-shadow 0.25s ease;
-    }
-    .trending-card:hover {
-      transform: translateY(-4px);
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-    }
-    .trending-card img {
-      width: 100%; aspect-ratio: 2/3; object-fit: cover; display: block;
-    }
-    .trending-rank {
-      position: absolute; top: 8px; left: 8px;
-      width: 24px; height: 24px;
-      background: rgba(59,130,246,0.85);
-      color: #fff; font-size: 11px; font-weight: 800;
-      border-radius: 6px;
-      display: flex; align-items: center; justify-content: center;
-    }
-    .trending-card-info {
-      position: absolute; bottom: 0; left: 0; right: 0;
-      background: linear-gradient(transparent, rgba(5,7,12,0.92));
-      padding: 24px 10px 10px;
-    }
-    .trending-card-name {
-      font-size: 12px; font-weight: 700; color: #e2e8f0; line-height: 1.3;
-    }
-    .trending-card-dl {
-      font-size: 10px; color: rgba(59,130,246,0.55); margin-top: 2px;
-    }
-
-    .cat-tabs {
-      display: flex; gap: 8px; flex-wrap: wrap;
-      margin-bottom: 24px;
-    }
-    .cat-tab {
-      font-family: var(--font-sans);
-      font-size: 13px; font-weight: 600; padding: 8px 18px;
-      border-radius: 99px; border: 1px solid rgba(255, 255, 255, 0.05);
-      background: rgba(15, 23, 42, 0.45); color: rgba(255, 255, 255, 0.6); cursor: pointer;
-      backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-      transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
-      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
-    }
-    .cat-tab:hover {
-      background: rgba(45, 212, 191, 0.06);
-      border-color: rgba(45, 212, 191, 0.2);
-      color: #fff;
-      transform: translateY(-1.5px);
-      box-shadow: 0 4px 12px rgba(45, 212, 191, 0.08);
-    }
-    .cat-tab.active {
-      background: linear-gradient(135deg, rgba(45, 212, 191, 0.16) 0%, rgba(59, 130, 246, 0.1) 100%);
-      color: #2dd4bf;
-      border-color: rgba(45, 212, 191, 0.4);
-      font-weight: 700;
-      transform: translateY(-1.5px) scale(1.02);
-      box-shadow: 0 4px 16px rgba(45, 212, 191, 0.16), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-    }
-    .featured-star { position: absolute; top: 8px; right: 8px; font-size: 14px; }
-
-    
-    .coming-soon-overlay {
-      position: absolute; inset: 0; background: rgba(5,7,12,0.75);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; font-weight: 700; color: #f59e0b; letter-spacing: 1px;
-      text-transform: uppercase;
-    }
-
-    
-    .game-skeleton {
-      background: linear-gradient(90deg, #0f1119 25%, #1a1f2e 50%, #0f1119 75%);
-      background-size: 200% 100%;
-      animation: shimmer 1.4s infinite;
-      border-radius: 12px;
-      aspect-ratio: 2/3;
-    }
-    @keyframes shimmer { 0%{background-position:200% 0;} 100%{background-position:-200% 0;} }
-
-    
-    .toast-msg {
-      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-      background: rgba(18,22,30,0.95); border: 1px solid rgba(45,212,191,0.3);
-      border-radius: 30px; padding: 10px 22px; font-size: 13px;
-      color: #e2e8f0; z-index: 9999; animation: fadeUp 0.2s ease;
-      backdrop-filter: blur(8px); white-space: nowrap;
-    }
-    @keyframes fadeUp { from{opacity:0;transform:translate(-50%,8px);} to{opacity:1;transform:translate(-50%,0);} }
-
-    /* ── VIP NOTIFICATION BELL ── */
-    .notif-btn {
-      position: relative; background: none; border: none; cursor: pointer;
-      font-size: 20px; padding: 4px 8px; color: #8892b0;
-      transition: color 0.2s; touch-action: manipulation;
-    }
-    .notif-btn:hover { color: #e2e8f0; }
-    .notif-btn .notif-dot {
-      position: absolute; top: 2px; right: 4px; width: 8px; height: 8px;
-      background: #f59e0b; border-radius: 50%; display: none;
-      box-shadow: 0 0 8px rgba(245,158,11,0.5);
-    }
-    .notif-btn .notif-dot.show { display: block; }
-    .notif-dropdown {
-      position: absolute; top: 100%; right: 0; width: 340px;
-      max-height: 400px; overflow-y: auto;
-      background: rgba(14,18,28,0.96); border: 1px solid rgba(45,212,191,0.15);
-      border-radius: 14px; box-shadow: 0 16px 48px rgba(0,0,0,0.6);
-      backdrop-filter: blur(16px); display: none; z-index: 500;
-      margin-top: 8px;
-    }
-    .notif-dropdown.open { display: block; }
-    .notif-dropdown-header {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 14px 16px 10px; border-bottom: 1px solid rgba(255,255,255,0.06);
-      font-size: 13px; font-weight: 700; color: #e2e8f0;
-    }
-    .notif-dropdown-header span { font-size: 11px; color: #f59e0b; font-weight: 600; cursor: pointer; }
-    .notif-dropdown-header span:hover { text-decoration: underline; }
-    .notif-item {
-      padding: 12px 16px; border-bottom: 1px solid rgba(255,255,255,0.04);
-      transition: background 0.15s;
-    }
-    .notif-item:hover { background: rgba(45,212,191,0.04); }
-    .notif-item:last-child { border-bottom: none; }
-    .notif-item .notif-title { font-size: 13px; font-weight: 600; color: #f59e0b; margin-bottom: 3px; }
-    .notif-item .notif-msg { font-size: 12px; color: #8892b0; line-height: 1.4; }
-    .notif-item .notif-time { font-size: 10px; color: #5a6385; margin-top: 4px; }
-    .notif-item.unread {
-      background: rgba(245, 158, 11, 0.03);
-      border-left: 2px solid #f59e0b;
-      padding-left: 14px;
-    }
-    .notif-item.unread:hover {
-      background: rgba(245, 158, 11, 0.06);
-    }
-    .unread-tag {
-      display: inline-block;
-      font-size: 8px; font-weight: 900; color: #0d0f14;
-      background: #f59e0b; padding: 1px 4px; border-radius: 3px;
-      margin-left: 6px; vertical-align: middle;
-      letter-spacing: 0.5px;
-    }
-    .notif-empty { padding: 24px 16px; text-align: center; color: #5a6385; font-size: 13px; }
-    .notif-btn-wrap { position: relative; display: inline-block; }
-
-    /* ── VIP POP-UP NOTIFICATION ── */
-    .vip-popup {
-      position: fixed; top: 20px; right: 20px; z-index: 99999;
-      background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(239,68,68,0.08));
-      border: 1px solid rgba(245,158,11,0.3);
-      border-radius: 16px; padding: 18px 22px; max-width: 360px;
-      backdrop-filter: blur(16px);
-      box-shadow: 0 12px 48px rgba(0,0,0,0.5), 0 0 40px rgba(245,158,11,0.08);
-      animation: vipPopIn 0.45s cubic-bezier(0.22,1,0.36,1);
-      cursor: pointer; display: flex; align-items: flex-start; gap: 14px;
-    }
-    @keyframes vipPopIn {
-      from { opacity: 0; transform: translateX(60px) scale(0.92); }
-      to { opacity: 1; transform: translateX(0) scale(1); }
-    }
-    @keyframes vipPopOut {
-      from { opacity: 1; transform: translateX(0) scale(1); }
-      to { opacity: 0; transform: translateX(60px) scale(0.92); }
-    }
-    .vip-popup .vip-popup-icon {
-      width: 40px; height: 40px; border-radius: 50%; flex-shrink: 0;
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 20px; box-shadow: 0 4px 16px rgba(245,158,11,0.3);
-    }
-    .vip-popup .vip-popup-body { flex: 1; min-width: 0; }
-    .vip-popup .vip-popup-title {
-      font-size: 14px; font-weight: 700; color: #f59e0b;
-      margin-bottom: 3px; line-height: 1.3;
-    }
-    .vip-popup .vip-popup-msg {
-      font-size: 12px; color: #8892b0; line-height: 1.4;
-    }
-    .vip-popup .vip-popup-close {
-      background: none; border: none; color: #5a6385; cursor: pointer;
-      font-size: 16px; padding: 0 2px; flex-shrink: 0;
-      transition: color 0.15s; touch-action: manipulation;
-    }
-    .vip-popup .vip-popup-close:hover { color: #e2e8f0; }
-
-    
-    .dl-badge {
-      display: inline-flex; align-items: center; gap: 4px; font-size: 11px;
-      background: rgba(45,212,191,0.08); color: rgba(45,212,191,0.7);
-      border-radius: 20px; padding: 2px 8px; margin-left: 6px;
-    }
-
-    
-    .empty-state {
-      text-align: center; padding: 60px 20px; color: #8892b0;
-    }
-    .empty-state h3 { font-size: 18px; margin-bottom: 8px; }
-    .empty-state p { font-size: 14px; }
-
-    
-    #bgCanvas {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .bg-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
-      background:
-        radial-gradient(ellipse at 20% 50%, rgba(45,212,191,.06) 0%, transparent 50%),
-        radial-gradient(ellipse at 80% 20%, rgba(124,58,237,.05) 0%, transparent 50%),
-        radial-gradient(ellipse at 50% 80%, rgba(247,183,51,.04) 0%, transparent 50%);
-      z-index: 0;
-      pointer-events: none;
-    }
-    .grid-overlay {
-      position: fixed;
-      top: 0; left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-image:
-        linear-gradient(rgba(45,212,191,.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(45,212,191,.03) 1px, transparent 1px);
-      background-size: 60px 60px;
-      z-index: 0;
-      pointer-events: none;
-    }
-    .content-wrap {
-      position: relative;
-      z-index: 1;
-      overflow-x: hidden;
-    }
-
-    #gamevault-chat-root {
-      position: fixed;
-      bottom: 90px;
-      right: 22px;
-      z-index: 9999;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 14px;
-      font-family: 'Inter', Arial, sans-serif;
-      pointer-events: none;
-    }
-    #gvChatBtn {
-      width: 64px; height: 64px; border-radius: 50%; border: none; cursor: pointer;
-      background: #fff;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 20px rgba(0,0,0,0.15);
-      transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.25s ease;
-      position: relative;
-      will-change: transform;
-      backface-visibility: hidden;
-      pointer-events: auto;
-    }
-    #gvChatBtn::after {
-      content: ''; position: absolute; inset: -4px; border-radius: 50%;
-      border: 2px solid rgba(0,0,0,0.08);
-      animation: gvPulseRing 2.4s ease-out infinite;
-    }
-    @keyframes gvPulseRing {
-      0%   { transform: scale(1); opacity: 1; }
-      60%  { transform: scale(1.3); opacity: 0; }
-      100% { transform: scale(1.3); opacity: 0; }
-    }
-    #gvChatBtn:hover {
-      transform: scale(1.12);
-      box-shadow: 0 8px 28px rgba(0,0,0,0.2);
-    }
-    #gvChatBtn:active {
-      transform: scale(0.95);
-    }
-    #gvChatBtn img {
-      width: 64px; height: 64px; object-fit: cover;
-      pointer-events: none;
-      display: block;
-      border-radius: 50%;
-    }
-    #gvChatBtn.open { animation: none; }
-    #gvChatBtn.open::after { display: none; }
-    #gvChatBox {
-      width: 365px; height: 530px;
-      background: rgba(13,15,20,0.96);
-      backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
-      border: 1px solid rgba(59,130,246,0.15);
-      border-radius: 22px;
-      display: flex; flex-direction: column; overflow: hidden;
-      box-shadow:
-        0 0 0 1px rgba(59,130,246,0.06),
-        0 28px 60px rgba(0,0,0,0.7),
-        inset 0 1px 0 rgba(59,130,246,0.08);
-      transform: scale(0.88) translateY(24px);
-      transform-origin: bottom right;
-      opacity: 0; pointer-events: none;
-      transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1), opacity 0.25s ease;
-      will-change: transform, opacity;
-      backface-visibility: hidden;
-    }
-    #gvChatBox.open {
-      transform: scale(1) translateY(0);
-      opacity: 1; pointer-events: all;
-    }
-    .gv-header {
-      padding: 14px 16px;
-      background: linear-gradient(135deg, rgba(59,130,246,0.1), rgba(139,92,246,0.06));
-      border-bottom: 1px solid rgba(59,130,246,0.12);
-      display: flex; align-items: center; gap: 11px;
-      flex-shrink: 0;
-    }
-    .gv-header-avatar {
-      width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0; overflow: hidden;
-      background: #fff;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 0 14px rgba(59,130,246,0.35);
-    }
-    .gv-header-avatar img {
-      width: 100%; height: 100%; object-fit: cover; display: block;
-    }
-    .gv-header-info { flex: 1; min-width: 0; }
-    .gv-header-name {
-      font-weight: 700; font-size: 13.5px;
-      color: var(--color-text); letter-spacing: 0.2px;
-    }
-    .gv-header-status {
-      font-size: 11px; color: var(--color-primary);
-      display: flex; align-items: center; gap: 5px; margin-top: 1px;
-    }
-    .gv-status-dot {
-      width: 6px; height: 6px; border-radius: 50%;
-      background: #22c55e;
-      box-shadow: 0 0 6px #22c55e;
-      animation: gvBlink 2s ease-in-out infinite;
-    }
-    @keyframes gvBlink { 0%,100%{opacity:1} 50%{opacity:0.4} }
-    .gv-messages {
-      flex: 1; overflow-y: auto; padding: 14px 14px 6px;
-      display: flex; flex-direction: column; gap: 10px;
-      scroll-behavior: smooth;
-    }
-    .gv-messages::-webkit-scrollbar { width: 3px; }
-    .gv-messages::-webkit-scrollbar-track { background: transparent; }
-    .gv-messages::-webkit-scrollbar-thumb {
-      background: rgba(59,130,246,0.2); border-radius: 3px;
-    }
-    .msg {
-      max-width: 84%;
-      font-size: 13.5px; line-height: 1.58;
-      padding: 10px 14px; border-radius: 16px;
-      word-break: break-word;
-      animation: gvMsgIn 0.22s ease;
-    }
-    @keyframes gvMsgIn {
-      from { opacity:0; transform:translateY(8px) scale(0.97); }
-      to   { opacity:1; transform:none; }
-    }
-    .msg.bot {
-      background: rgba(18,22,30,0.9);
-      border: 1px solid rgba(59,130,246,0.12);
-      align-self: flex-start;
-      border-bottom-left-radius: 4px;
-      color: var(--color-text);
-    }
-    .msg.user {
-      background: linear-gradient(135deg, rgba(59,130,246,0.2), rgba(139,92,246,0.14));
-      border: 1px solid rgba(59,130,246,0.25);
-      align-self: flex-end;
-      border-bottom-right-radius: 4px;
-      color: #fff;
-    }
-    .msg b { color: var(--color-primary); }
-    .gv-ts {
-      font-size: 9px; margin-top: 4px; opacity: 0.35; display: block;
-    }
-    .typing-indicator {
-      display: flex; gap: 5px; align-items: center;
-      padding: 11px 15px;
-      background: rgba(18,22,30,0.9);
-      border: 1px solid rgba(59,130,246,0.12);
-      border-radius: 16px; border-bottom-left-radius: 4px;
-      align-self: flex-start;
-      animation: gvMsgIn 0.22s ease;
-    }
-    .typing-dot {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: rgba(59,130,246,0.5);
-      animation: smoothBounce 1.4s ease-in-out infinite;
-    }
-    .typing-dot:nth-child(2) { animation-delay: 0.2s; }
-    .typing-dot:nth-child(3) { animation-delay: 0.4s; }
-    @keyframes smoothBounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-9px)} }
-    .gv-suggestions {
-      display: flex; gap: 5px; flex-wrap: wrap;
-      padding: 0 14px 8px; flex-shrink: 0;
-    }
-    .gv-suggestions button {
-      font-size: 11px; padding: 5px 11px; border-radius: 99px; cursor: pointer;
-      background: rgba(59,130,246,0.07);
-      border: 1px solid rgba(59,130,246,0.18);
-      color: rgba(59,130,246,0.75);
-      transition: background 0.15s, color 0.15s, border-color 0.15s;
-      white-space: nowrap;
-    }
-    .gv-suggestions button:hover {
-      background: rgba(59,130,246,0.14);
-      border-color: rgba(59,130,246,0.35);
-      color: var(--color-primary);
-    }
-    .gv-chips {
-      display: flex; gap: 5px; flex-wrap: wrap;
-      padding: 4px 0 2px; align-self: flex-start; max-width: 84%;
-    }
-    .gv-chips button {
-      font-size: 11px; padding: 4px 11px; border-radius: 99px; cursor: pointer;
-      background: rgba(139,92,246,0.07);
-      border: 1px solid rgba(139,92,246,0.22);
-      color: rgba(139,92,246,0.8);
-      transition: background 0.15s, color 0.15s;
-    }
-    .gv-chips button:hover {
-      background: rgba(139,92,246,0.16);
-      color: #a78bfa;
-    }
-    .gv-input-area {
-      padding: 10px 12px;
-      background: rgba(13,15,20,0.8);
-      border-top: 1px solid rgba(59,130,246,0.1);
-      display: flex; gap: 9px; align-items: flex-end; flex-shrink: 0;
-    }
-    #gvInput {
-      flex: 1;
-      background: rgba(18,22,30,0.9);
-      border: 1px solid rgba(59,130,246,0.15);
-      border-radius: 12px;
-      padding: 10px 13px;
-      color: var(--color-text);
-      font-size: 13.5px;
-      font-family: inherit;
-      resize: none; outline: none;
-      max-height: 100px; min-height: 38px;
-      line-height: 1.5;
-      transition: border-color 0.2s, box-shadow 0.2s;
-    }
-    #gvInput::placeholder { color: rgba(59,130,246,0.3); }
-    #gvInput:focus {
-      border-color: rgba(59,130,246,0.45);
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.07);
-    }
-    #gvSend {
-      width: 40px; height: 40px; border-radius: 12px; border: none; cursor: pointer;
-      background: var(--color-primary);
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0;
-      transition: opacity 0.2s, transform 0.15s;
-      box-shadow: 0 4px 14px rgba(59,130,246,0.3);
-    }
-    #gvSend:hover { opacity: 0.88; transform: translateY(-1px); }
-    #gvSend:active { transform: scale(0.94); }
-    #gvSend svg { width: 16px; height: 16px; fill: #fff; }
-    #gvSend:disabled { opacity: 0.35; cursor: not-allowed; transform: none; }
-    .gv-vip-badge {
-      font-size: 9px; font-weight: 800; letter-spacing: 0.8px;
-      padding: 2px 8px; border-radius: 99px;
-      background: linear-gradient(135deg, #f59e0b, #ef4444);
-      color: #fff; text-transform: uppercase; flex-shrink: 0;
-    }
-
-    @media (max-width: 480px) {
-      #gamevault-chat-root { bottom: 76px; right: 12px; gap: 10px; }
-      #gvChatBtn { width: 56px; height: 56px; }
-      #gvChatBtn img { width: 56px; height: 56px; }
-      #gvChatBox { width: calc(100vw - 24px); height: 460px; }
-    }
-
-  </style>
-</head>
-<body>
-
-<div class="content-wrap">
-
-<div id="loadingOverlay">
-  <canvas id="loadParticles" class="load-bg-canvas"></canvas>
-  <div class="load-scanlines"></div>
-  <div class="load-content">
-    <div class="load-logo"><img src="images/icon2.png" alt="GameVault" style="height:48px;"></div>
-
-    <div class="load-tier-container">
-      <div class="load-tier-card tier-member" id="tierMember">
-        <div class="tier-badge member">MEMBER</div>
-        <div class="tier-sub">Member Access Loading...</div>
-      </div>
-      <div class="load-tier-card tier-elite" id="tierElite">
-        <div class="tier-badge elite">ELITE</div>
-        <div class="tier-sub">Elite Access Detected...</div>
-      </div>
-      <div class="load-tier-card tier-vip" id="tierVip">
-        <div class="tier-badge vip">VIP</div>
-        <div class="tier-sub vip">VIP ACCESS UNLOCKED</div>
-      </div>
-      <div class="load-tier-card tier-welcome" id="tierWelcome">
-        <div class="load-final-title">Welcome to GameVault</div>
-        <div class="load-final-sub">Access Granted</div>
-      </div>
-    </div>
-
-    <div class="load-text-wrap">
-      <div class="load-text" id="loadText">Initializing System...</div>
-      <div class="load-text hidden" id="loadText2"></div>
-    </div>
-    <div class="load-bar-wrap"><div class="load-bar" id="loadBar"></div></div>
-    <div style="display:flex;gap:6px;margin-top:4px;" id="loadDots">
-      <span class="load-progress-dot active"></span>
-      <span class="load-progress-dot"></span>
-      <span class="load-progress-dot"></span>
-      <span class="load-progress-dot"></span>
-    </div>
-  </div>
-</div>
-
-  
-  <canvas id="bgCanvas"></canvas>
-  <div class="bg-overlay"></div>
-  <div class="grid-overlay"></div>
-
-<div id="protected-content">
-
-  <header class="navbar" role="navigation" aria-label="Main navigation">
-    <div class="navbar__inner">
-      <a href="." class="navbar__logo">
-        <img src="images/icon.png" alt="GameVault" style="height:120px;width:auto;">
-      </a>
-      <ul class="navbar__links">
-        <li><a href="." class="navbar__link active">Home</a></li>
-        <li><a href="updates/" class="navbar__link">Updates</a></li>
-        <li><a href="ann/" class="navbar__link">News</a></li>
-        <li><a href="faq/" class="navbar__link">Support</a></li>
-        <li><a href="#browseAll" class="navbar__link">Games</a></li>
-
-      </ul>
-      <div class="navbar__actions">
-        <span class="notif-btn-wrap">
-          <button class="notif-btn" id="notifBell" aria-label="VIP Notifications">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-            <span class="notif-dot" id="notifDot"></span>
-          </button>
-          <div class="notif-dropdown" id="notifDropdown">
-            <div class="notif-dropdown-header">
-              Notifications
-              <span id="notifMarkRead" style="display:none;">Mark all read</span>
-            </div>
-            <div id="notifList"></div>
-            <div style="padding:8px 16px 10px;border-top:1px solid rgba(255,255,255,0.06);text-align:center;">
-              <a href="vip-notify/" style="font-size:11px;color:#f59e0b;font-weight:600;text-decoration:none;">View all notifications →</a>
-            </div>
-          </div>
-        </span>
-        <span id="userBadge" style="display:none; font-size:10px; font-weight:800; padding:2px 10px; border-radius:20px; letter-spacing:0.5px; white-space:nowrap;"></span>
-        <div class="navbar-search">
-          <span class="search-icon"></span>
-          <input type="text" id="search" placeholder="Search games…" autocomplete="off">
-        </div>
-        <a href="software/" class="nav-software-btn">Softwares</a>
-        <button class="navbar__hamburger" id="nav-hamburger" aria-label="Toggle menu">
-          <span></span><span></span><span></span>
-        </button>
-      </div>
-    </div>
-    <nav class="navbar__mobile" id="nav-mobile">
-          <a href="." class="navbar__mobile-link">Home</a>
-      <a href="updates/" class="navbar__mobile-link">Updates</a>
-      <a href="ann/" class="navbar__mobile-link">News</a>
-      <a href="software/" class="navbar__mobile-link">Softwares</a>
-      <a href="faq/" class="navbar__mobile-link">Support</a>
-      <a href="#browseAll" class="navbar__mobile-link">Games</a>
-    </nav>
-  </header>
-
-  <section class="hero" aria-label="Featured games">
-    <div class="hero__slider" id="hero-slider">
-      <div class="hero__slide">
-        <img class="hero__bg" src="https://i.imgur.com/qCn3NZD.jpg" alt="GameVault Hero" loading="eager">
-        <div class="hero__overlay" aria-hidden="true"></div>
-        <div class="hero__overlay-bottom" aria-hidden="true"></div>
-        <div class="hero__content container">
-          <div class="hero__eyebrow">
-            <div class="hero__eyebrow-dot"></div>
-            <span class="hero__label">PC Game Downloads</span>
-            <span class="badge badge--accent">Instant Access</span>
-          </div>
-          <h1 class="hero__title">Pre-installed.<br><span class="typing-wrap"><span class="typing-text" id="typingText"></span><span class="typing-cursor"></span></span></h1>
-          <p class="hero__description">Download and play instantly — no setup required. New games added every week.</p>
-          <div class="hero__actions">
-            <a href="#games" class="btn btn--primary btn--xl">Browse Games</a>
-            <a href="updates/" class="btn btn--secondary btn--xl">What's New</a>
-          </div>
-          <div class="hero__meta">
-            <div class="hero__meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              400+ Games
-            </div>
-            <div class="hero__meta-item">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-              Always Available
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <section class="trust-bar">
-    <div class="trust-bar__inner">
-      <div class="trust-bar__item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-        Secure Downloads
-      </div>
-      <div class="trust-bar__item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        Instant Access
-      </div>
-      <div class="trust-bar__item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-        400+ Games Updated
-      </div>
-      <div class="trust-bar__item">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
-        Trusted Platform
-      </div>
-    </div>
-  </section>
-
-  
-  <span id="games" style="display:block;height:0;overflow:hidden;" aria-hidden="true"></span>
-
-  <section id="featuredSection" class="games-section">
-    <div class="section-title"><h2> Featured Picks</h2><a href="#browseAll" class="section-link">Browse All →</a></div>
-    <div class="feat-carousel">
-      <div class="feat-viewport">
-        <div class="feat-track" id="featTrack"></div>
-      </div>
-      <button class="feat-arrow feat-prev" aria-label="Previous">‹</button>
-      <button class="feat-arrow feat-next" aria-label="Next">›</button>
-      <div class="feat-progress"><span id="featProgress"></span></div>
-      <div class="feat-dots" id="featDots"></div>
-      <div class="feat-thumbs" id="featThumbs"></div>
-    </div>
-  </section>
-
-  <section id="trendingSection" class="games-section">
-    <div class="section-title"><h2> Trending Games</h2><a href="#browseAll" class="section-link">Most Downloaded →</a></div>
-    <div class="scroll-row" id="trendingRow"></div>
-  </section>
-
-  <section class="games-section" id="browseAll">
-    <div class="cat-tabs" id="catTabs"></div>
-    <div class="section-title" style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px;">
-      <h2 id="sectionHeading">Browse All Games</h2>
-      <span id="gameCount" style="font-size:13px; color:#8892b0;"></span>
-    </div>
-    <div class="games-grid" id="gamesGrid"></div>
-    <div id="loadMoreWrap" style="text-align:center; margin-top:24px; display:none;">
-      <button id="loadMoreBtn" style="padding:10px 28px; background:rgba(45,212,191,0.1); border:1px solid rgba(45,212,191,0.3); color:#2dd4bf; border-radius:30px; font-size:13px; cursor:pointer;">Load More Games</button>
-    </div>
-  </section>
-
-
-  <footer class="footer">
-    <div class="footer__grid container">
-      <div class="footer__col">
-        <a href="." style="display:inline-block;margin-bottom:1rem;">
-          <img src="images/icon2.png" alt="GameVault" style="height:200px;width:auto;">
-        </a>
-        <p class="footer__brand">Premium game downloads platform. Instant access, no setup required. 400+ games available.</p>
-        <div class="footer__social">
-          <a href="https://www.facebook.com/profile.php?id=61590194378758" target="_blank" aria-label="Facebook">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M24 12.073c0-6.627-5.373-12-12-12S0 5.446 0 12.073c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-          </a>
-        </div>
-      </div>
-      <div class="footer__col">
-        <div class="footer__heading">Quick Links</div>
-        <div class="footer__links">
-          <a href=".">Home</a>
-          <a href="ann/">News</a>
-          <a href="faq/">Support</a>
-        </div>
-      </div>
-      <div class="footer__col">
-        <div class="footer__heading">Support</div>
-        <div class="footer__links">
-          <a href="faq/">FAQ</a>
-          <a href="payment/">Payment Plans</a>
-          <a href="ann/">Announcements</a>
-        </div>
-      </div>
-      <div class="footer__col">
-        <div class="footer__heading">Legal</div>
-        <div class="footer__links">
-          <a href="privacy/">Privacy Policy</a>
-          <a href="terms/">Terms of Service</a>
-          <a href="refund/">Refund Policy</a>
-        </div>
-      </div>
-    </div>
-    <div class="footer__bottom">
-      <span>© 2026 GameVault — All rights reserved.</span>
-      <div class="footer__legal">
-        <a href="privacy/">Privacy</a>
-        <a href="terms/">Terms</a>
-      </div>
-    </div>
-  </footer>
-</div>
-
-<div id="expiryTicker"><span id="expiryTickerText"></span></div>
-
-
-<div id="accessModal" class="access-modal-overlay">
-  <div class="access-modal glass-panel">
-    <h2>Secure Access Required</h2>
-    <p>Enter your access code <strong>or</strong> choose a plan</p>
-    <input type="text" id="accessCodeInput" class="access-input" placeholder="XXXX-XXXX-XXXX" autocomplete="off">
-    <input type="email" id="accessEmailInput" class="access-input" placeholder="Email Address (optional if you have a VIP code)" autocomplete="email" style="margin-top:8px;">
-    <div id="accessError" class="access-error"></div>
-    <button id="verifyAccessBtn" class="verify-btn">UNLOCK GAMEVAULT</button>
-    <a href="payment/" target="_blank" class="view-plans-btn" style="display:inline-block; text-decoration:none; margin-top:18px;">
-      <span></span> VIEW ACCESS PLANS <span></span>
-    </a>
-    <div id="plansWrapper" class="plans-wrapper">
-      <div class="plans-grid">
-        <div class="plan-card"><div class="featured-badge" style="background:linear-gradient(135deg,#10b981,#059669);font-size:0.55rem;padding:2px 8px;">MEMBER</div><div class="plan-name">2 DAYS</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">₱65</span> ₱55</div><ul class="plan-features"><li>1 Device</li><li>All Downloads</li><li>Fast Activation</li></ul><button class="get-access-btn" onclick="window.open('payment/','_blank')">Get Access</button></div>
-        <div class="plan-card"><div class="featured-badge" style="background:linear-gradient(135deg,#8b5cf6,#6d28d9);font-size:0.55rem;padding:2px 8px;">ELITE</div><div class="plan-name">3 DAYS</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">₱99</span> ₱65</div><ul class="plan-features"><li>3 Devices</li><li>All Downloads</li><li>Fast Activation</li></ul><button class="get-access-btn" onclick="window.open('payment/','_blank')">Get Access</button></div>
-        <div class="plan-card featured"><div class="featured-badge" style="background:linear-gradient(135deg,#f59e0b,#ef4444);font-size:0.55rem;padding:2px 8px;">VIP</div><div class="plan-name">LIFETIME</div><div class="plan-price"><span style="text-decoration:line-through;color:var(--text-muted);font-size:0.7rem;margin-right:4px;">₱129</span> ₱99</div><ul class="plan-features"><li>Any Device</li><li>Unlimited Downloads</li><li>Lifetime Access</li></ul><button class="get-access-btn" onclick="window.open('payment/','_blank')">Get Access</button></div>
-      </div>
-      <p style="font-size:0.65rem; color:#6f7893; margin-top:12px;">After payment, enter your email to receive the access code instantly.</p>
-    </div>
-    <div id="expiryBadge"><span id="expiryBadgeText"></span></div>
-    <div class="modal-footer">Need help? Contact support on Facebook</div>
-  </div>
-</div>
-
-
-<div id="revokedOverlay">
-  <div class="revoked-card">
-    <div class="revoked-icon" id="revokedIcon"></div>
-    <h2 id="revokedTitle">Access Revoked</h2>
-    <p id="revokedMsg">Your access code has been disabled or expired.</p>
-    <div class="sub">Contact support.</div>
-  </div>
-</div>
-
-</div> 
-
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/Draggable.min.js"></script>
-<script src="swiper.js"></script>
-<script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
-
-<script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-  import {
-    getFirestore, doc, collection, onSnapshot, query, orderBy, limit
-  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
-  import {
-    getFunctions, httpsCallable
-  } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js";
-
-  // ===== EMAILJS CONFIG =====
-  const EMAILJS_PUBLIC_KEY  = "YOUR_EMAILJS_PUBLIC_KEY";
-  const EMAILJS_SERVICE_ID  = "YOUR_EMAILJS_SERVICE_ID";
-  const EMAILJS_TEMPLATE_ID = "YOUR_EMAILJS_TEMPLATE_ID";
-
-  const GCASH_QR_IMAGE_URL = "images/gcash-qr.jpg";
-  const GAMES_PER_BATCH = 24; // lazy-load batch size
-
-  const firebaseConfig = {
-    apiKey: "AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM",
-    authDomain: "gamevault-6f5b1.firebaseapp.com",
-    projectId: "gamevault-6f5b1",
-    storageBucket: "gamevault-6f5b1.firebasestorage.app",
-    messagingSenderId: "958994391207",
-    appId: "1:958994391207:web:7c398da9bc39437c7ebb82",
-    measurementId: "G-8TFM4KS3LL"
-  };
-
-  const app = initializeApp(firebaseConfig);
-  const db  = getFirestore(app);
-  const functions_ = getFunctions(app);
-  const verifyCodeFn = httpsCallable(functions_, 'verifyAccessCode');
-  const getGamesListFn = httpsCallable(functions_, 'getGamesList');
-  const getGameDownloadUrlFn = httpsCallable(functions_, 'getGameDownloadUrl');
-  const checkCodeStatusFn = httpsCallable(functions_, 'checkCodeStatus');
-  window.emailjs?.init(EMAILJS_PUBLIC_KEY);
-
-  
-  const _rl = { c: 0, t: 0 };
-  function _checkRL() {
-    const now = Date.now();
-    if (now > _rl.t) { _rl.c = 0; _rl.t = now + 60000; }
-    return ++_rl.c <= 5;
-  }
-
-  
-  const KEY_ACCESS  = 'gv_access';
-  const KEY_CODE    = 'gv_code';
-  const KEY_SESSION = 'gv_session';
-  const KEY_EMAIL   = 'gv_email';
-  
-  function _h(s) { let h = 0; for (let i = 0; i < s.length; i++) { h = Math.imul(31, h) + s.charCodeAt(i) | 0; } return (h >>> 0).toString(36); }
-  function _setAccess(code) { localStorage.setItem(KEY_ACCESS, _h('gv:' + code + ':2026')); }
-  function _isAccess(code) { return !!code && localStorage.getItem(KEY_ACCESS) === _h('gv:' + code + ':2026'); }
-
-  let liveUnsubscribe = null;
-  let expiryInterval  = null;
-
-  
-  let allGames      = window.GAMES_CATALOG ? [...window.GAMES_CATALOG] : [];
-  let displayedCount = 0;
-  let activeCategory = '';
-  let activeSearch   = '';
-
-  const _urlCache = new Map();
-
-  function _preloadUrlCache(catalog) {
-    (catalog || []).forEach(g => {
-      if (g.id && g.downloadUrl) _urlCache.set(g.id, g.downloadUrl);
-    });
-  }
-
-  async function getSecureDownloadUrl(gameId) {
-    if (_urlCache.has(gameId)) return _urlCache.get(gameId);
-    const codeKey = localStorage.getItem(KEY_CODE);
-    try {
-      const result = await getGameDownloadUrlFn({ gameId, codeKey });
-      if (result.data?.ok && result.data?.downloadUrl) {
-        _urlCache.set(gameId, result.data.downloadUrl);
-        return result.data.downloadUrl;
-      }
-      throw new Error('Access denied');
-    } catch (err) {
-      throw new Error('Access denied');
-    }
-  }
-
-  
-  function getSessionId() {
-    let sid = localStorage.getItem(KEY_SESSION);
-    if (!sid) {
-      sid = 'sess_' + Math.random().toString(36).slice(2,18) + Date.now().toString(36);
-      localStorage.setItem(KEY_SESSION, sid);
-    }
-    return sid;
-  }
-
-  function showError(msg) {
-    const el = document.getElementById('accessError');
-    if (el) el.innerText = msg;
-  }
-
-  function showToast(msg, duration = 1800) {
-    let el = document.querySelector('.toast-msg');
-    if (el) el.remove();
-    el = document.createElement('div');
-    el.className = 'toast-msg';
-    el.innerText = msg;
-    document.body.appendChild(el);
-    setTimeout(() => el?.remove(), duration);
-  }
-
-  
-
-  function escapeHtml(str) {
-    if (!str) return '';
-    return String(str).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-  }
-
-  function startTypingAnimation() {
-    const el = document.getElementById('typingText');
-    if (!el) return;
-    const texts = ['One-click ready.', 'One-time payment.', 'Lifetime access.', 'No malware.', 'No intrusive ads.'];
-    let textIdx = 0;
-    let charIdx = 0;
-    let dir = 1;
-    let timer = null;
-
-    function tick() {
-      const text = texts[textIdx];
-      charIdx += dir;
-      el.textContent = text.substring(0, charIdx);
-
-      if (dir === 1 && charIdx >= text.length) {
-        dir = -1;
-        timer = setTimeout(tick, 3000);
-      } else if (dir === -1 && charIdx <= 0) {
-        dir = 1;
-        textIdx = (textIdx + 1) % texts.length;
-        timer = setTimeout(tick, 800);
-      } else {
-        const speed = dir === 1 ? 55 + Math.random() * 55 : 25 + Math.random() * 35;
-        timer = setTimeout(tick, speed);
-      }
-    }
-
-    el.textContent = '';
-    timer = setTimeout(tick, 600);
-  }
-
-  
-
-
-  function renderCatTabs(cats) {
-    const container = document.getElementById('catTabs');
-    if (!container) return;
-    const cur = activeCategory;
-    container.innerHTML = '<button class="cat-tab' + (!cur ? ' active' : '') + '" data-cat="">All</button>' +
-      cats.map(c => `<button class="cat-tab${cur && cur.toLowerCase() === c.toLowerCase() ? ' active' : ''}" data-cat="${escapeHtml(c)}">${escapeHtml(c)}</button>`).join('');
-    container.querySelectorAll('.cat-tab').forEach(btn => {
-      btn.addEventListener('click', () => {
-        container.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activeCategory = btn.dataset.cat || '';
-        displayedCount = 0;
-        renderGames();
-      });
-    });
-  }
-
-  const ALLOWED_CATS = ['Action','Adventure','Anime','Horror','Indie','Multiplayer','Open World','Racing','Shooters','Simulation','Sports','Strategy','Virtual Reality'];
-  const DEFAULT_CAT = ALLOWED_CATS[0];
-  const TIER_HIERARCHY = { member: 0, elite: 1, vip: 2 };
-  const TIER_DEFAULT = 'member';
-
-  function getTierFilter() {
-    const raw = (localStorage.getItem('gv_tier') || TIER_DEFAULT).toLowerCase();
-    return TIER_HIERARCHY.hasOwnProperty(raw) ? raw : TIER_DEFAULT;
-  }
-
-  function tierAllows(tier, gameMembership) {
-    if (!gameMembership || gameMembership.toLowerCase() === 'all') return true;
-    const gameTier = gameMembership.toLowerCase();
-    if (!TIER_HIERARCHY.hasOwnProperty(gameTier)) return true;
-    return TIER_HIERARCHY[tier] >= TIER_HIERARCHY[gameTier];
-  }
-
-  function applyGames(merged) {
-    const userTier = getTierFilter();
-    const tierFiltered = merged.filter(g => {
-      if (!tierAllows(userTier, g.membership)) return false;
-      if (userTier === 'member' && g.releaseStatus && g.releaseStatus !== 'Full Release' &&
-          g.membership && g.membership !== 'All') return false;
-      return true;
-    });
-
-    allGames = tierFiltered.filter(g => !g.status || g.status === 'active').map(g => {
-      if (g.category && !ALLOWED_CATS.some(a => a.toLowerCase() === g.category.toLowerCase())) {
-        return { ...g, category: DEFAULT_CAT };
-      }
-      return g;
-    });
-
-    let cats = [...new Set(allGames.map(g => g.category).filter(Boolean))].sort();
-    renderCatTabs(cats);
-
-    renderFeatured(tierFiltered);
-    renderTrending(tierFiltered);
-    displayedCount = 0;
-    renderGames();
-  }
-
-  function loadGamesFromCatalog() {
-    // Show catalog immediately so user sees games right away
-    const catalogGames = (window.GAMES_CATALOG || []).map(g => ({
-      ...g, id: String(g.id), status: g.status || 'active',
-      downloads: g.downloads || 0, featured: g.featured || false, _source: 'catalog'
-    }));
-    _preloadUrlCache(catalogGames);
-    allGames = catalogGames.filter(g => !g.status || g.status === 'active');
-    try { applyGames(catalogGames); } catch(e) { console.error('applyGames error', e); }
-
-    // Fetch Firestore games via callable function (no downloadUrl exposed)
-    getGamesListFn().then(res => {
-      const fsGames = (res.data?.games || []).filter(g => g.status !== 'hidden');
-      const fsNames = new Set(fsGames.map(g => g.name?.toLowerCase()));
-      const catalogOnly = catalogGames.filter(g => !fsNames.has(g.name?.toLowerCase()));
-      const merged = [...fsGames, ...catalogOnly];
-      applyGames(merged);
-    }).catch(() => {
-      // Fall back to catalog-only if callable fails
-      if (!allGames.length && window.GAMES_CATALOG?.length) {
-        setTimeout(() => { if (!allGames.length) loadGamesFromCatalog(); }, 3000);
-      }
-    });
-  }
-
-  
-  function renderRow(containerId, games, limit = 12) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    if (!games.length) { container.closest('.games-section')?.classList.remove('show'); return; }
-    container.closest('.games-section')?.classList.add('show');
-    container.innerHTML = games.slice(0, limit).map(g => `
-      <div class="scroll-card" data-id="${g.id}" data-status="${g.status || 'active'}">
-        <img src="${escapeHtml(g.thumb || 'https://placehold.co/160x240/0f1119/2dd4bf?text=?')}"
-             alt="${escapeHtml(g.name)}" loading="lazy"
-             onerror="this.src='https://placehold.co/160x240/0f1119/2dd4bf?text=?'">
-        ${g.status === 'coming-soon' ? '<div class="coming-soon-overlay">Coming Soon</div>' : ''}
-        <div class="scroll-card-info">
-          <div class="scroll-card-name">${escapeHtml(g.name)}</div>
-          <div class="scroll-card-dl">⬇ ${(g.downloads || 0).toLocaleString()}</div>
-        </div>
-      </div>
-    `).join('');
-    container.querySelectorAll('.scroll-card').forEach(card => {
-      card.addEventListener('click', () => {
-        const status = card.dataset.status;
-        if (status === 'coming-soon') { showToast('🔜 Coming Soon!', 2000); return; }
-        handleDownload(card.dataset.id);
-      });
-    });
-  }
-
-  function renderFeatured(games) {
-    const featured = games.filter(g => g.featured);
-    const track = document.getElementById('featTrack');
-    if (!track) return;
-    const section = document.getElementById('featuredSection');
-    if (!featured.length) { section?.classList.remove('show'); return; }
-    section?.classList.add('show');
-
-    const CHUNK = 4;
-    const chunks = [];
-    for (let i = 0; i < featured.length; i += CHUNK) {
-      chunks.push(featured.slice(i, i + CHUNK));
-    }
-
-    track.innerHTML = chunks.map((chunk, ci) =>
-      `<div class="feat-slide${ci === 0 ? ' active' : ''}" data-index="${ci}">
-        ${chunk.map(g => {
-          const t = escapeHtml(g.thumb || 'https://placehold.co/400x560/0f1119/2dd4bf?text=?');
-          const n = escapeHtml(g.name);
-          const c = escapeHtml(g.category || 'Featured');
-          const d = (g.downloads || 0).toLocaleString();
-          return `<div class="feat-card" data-game-id="${g.id}" data-status="${g.status || 'active'}">
-            <div class="feat-card-img">
-              <img src="${t}" alt="${n}" loading="lazy" onerror="this.src='https://placehold.co/400x560/0f1119/2dd4bf?text=?'">
-              <div class="feat-card-overlay"></div>
-            </div>
-            <div class="feat-card-body">
-              <div class="feat-card-badge">${c}</div>
-              <div class="feat-card-title">${n}</div>
-              <div class="feat-card-meta">⬇ ${d}</div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>`
-    ).join('');
-
-    const carouselRoot = track.closest('.feat-carousel');
-    if (carouselRoot && !carouselRoot._swiper) {
-      carouselRoot._swiper = new Swiper(carouselRoot, card => {
-        if (card.dataset.status === 'coming-soon') { showToast('\uD83D\uDD1C Coming Soon!', 2000); return; }
-        handleDownload(card.dataset.gameId);
-      });
-    }
-
-  }
-
-  function renderTrending(games) {
-    const sorted = [...games].filter(g => g.status !== 'coming-soon').sort((a, b) => (b.downloads || 0) - (a.downloads || 0));
-    const container = document.getElementById('trendingRow');
-    if (!container) return;
-    container.innerHTML = sorted.slice(0, 20).map((g, i) => {
-      const thumb = escapeHtml(g.thumb || 'https://placehold.co/300x450/0f1119/3b82f6?text=?');
-      const name = escapeHtml(g.name);
-      const dl = (g.downloads || 0).toLocaleString();
-      const id = g.id;
-      return `<div class="trending-card" data-game-id="${id}">
-        <div class="trending-rank">${i + 1}</div>
-        <img src="${thumb}" alt="${name}" loading="lazy" onerror="this.src='https://placehold.co/300x450/0f1119/3b82f6?text=?'">
-        <div class="trending-card-info">
-          <div class="trending-card-name">${name}</div>
-          <div class="trending-card-dl">⬇ ${dl}</div>
-        </div>
-      </div>`;
-    }).join('');
-    container.querySelectorAll('.trending-card').forEach(card => {
-      card.addEventListener('click', () => {
-        handleDownload(card.dataset.gameId);
-      });
-    });
-  }
-
-  
-  function getFiltered() {
-    return allGames.filter(g => {
-      const matchName = !activeSearch || g.name?.toLowerCase().includes(activeSearch);
-      const matchCat  = !activeCategory || g.category?.toLowerCase() === activeCategory.toLowerCase();
-      return matchName && matchCat;
-    });
-  }
-
-  function renderGames() {
-    const filtered = getFiltered();
-    const grid = document.getElementById('gamesGrid');
-    const heading = document.getElementById('sectionHeading');
-    const countEl = document.getElementById('gameCount');
-    const loadMoreWrap = document.getElementById('loadMoreWrap');
-
-    if (heading) heading.textContent = activeCategory ? `${activeCategory} Games` : 'All Games';
-    if (countEl) countEl.textContent = `${filtered.length} game${filtered.length !== 1 ? 's' : ''}`;
-
-    if (!filtered.length) {
-      grid.innerHTML = `<div class="empty-state"><h3>No games found</h3><p>Try a different search or category.</p></div>`;
-      if (loadMoreWrap) loadMoreWrap.style.display = 'none';
-      return;
-    }
-
-    const batch = filtered.slice(0, displayedCount + GAMES_PER_BATCH);
-    displayedCount = batch.length;
-
-    grid.innerHTML = batch.map(g => `
-      <div class="game-card" data-game-id="${g.id}" data-category="${escapeHtml(g.category)}" data-name="${escapeHtml(g.name)}">
-        <div class="thumbnail">
-          <span class="tag">${escapeHtml(g.category || '')}</span>
-          <img src="${escapeHtml(g.thumb || 'https://placehold.co/300x450/0f1119/2dd4bf?text=?')}"
-               alt="${escapeHtml(g.name)}" loading="lazy"
-               onerror="this.src='https://placehold.co/300x450/0f1119/2dd4bf?text=?'">
-          <button class="quick-download" data-game-id="${g.id}" data-name="${escapeHtml(g.name)}">
-            <span>⬇ Download</span>
-          </button>
-        </div>
-        <div class="game-info">
-          <h3>${escapeHtml(g.name)}</h3>
-          <div class="dl-badge">⬇ ${(g.downloads || 0).toLocaleString()}</div>
-        </div>
-      </div>
-    `).join('');
-
-    // Click handlers for game key system
-    grid.querySelectorAll('.game-card').forEach(card => {
-      card.addEventListener('click', (e) => {
-        if (e.target.closest('.quick-download')) return;
-        handleDownload(card.dataset.gameId);
-      });
-    });
-
-    grid.querySelectorAll('.quick-download').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.preventDefault();
-        e.stopPropagation();
-        handleDownload(btn.dataset.gameId);
-      });
-    });
-
-    // Load more
-    if (loadMoreWrap) {
-      loadMoreWrap.style.display = displayedCount < filtered.length ? 'block' : 'none';
-    }
-  }
-
-  
-  async function handleDownload(gameId) {
-    let url;
-    try {
-      url = await getSecureDownloadUrl(gameId);
-    } catch {
-      showToast('Access denied', 2000);
-      return;
-    }
-    showToast('⬇ Download starting...', 1600);
-    window.open(url, '_blank', 'noopener');
-    // Download counter is incremented server-side by getGameDownloadUrl
-    const game = allGames.find(g => g.id === gameId);
-    if (game) {
-      game.downloads = (game.downloads || 0) + 1;
-      const badge = document.querySelector(`.game-card[data-game-id="${gameId}"] .dl-badge`);
-      if (badge) badge.textContent = `⬇ ${game.downloads.toLocaleString()}`;
-    }
-  }
-
-  // Load more button
-  document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('loadMoreBtn')?.addEventListener('click', () => {
-      renderGames();
-    });
+/**
+ * GameVault Cloud Functions
+ * Production-ready payment automation, code generation, and email system
+ */
+
+const functions = require("firebase-functions");
+const admin = require("firebase-admin");
+const nodemailer = require("nodemailer");
+const crypto = require("crypto");
+
+admin.initializeApp();
+const db = admin.firestore();
+
+// ─── CONSTANTS ────────────────────────────────────────────────────────────────
+const PLANS = {
+  '2 Days':    { name: '2 Day Pass',   price: 55,  durationDays: 2,   features: ['Access to all games', '1 device', 'Fast activation'] },
+  '3 Days':    { name: '3 Day Pass',   price: 65,  durationDays: 3,   features: ['Access to all games', '3 devices', 'Fast activation'] },
+  'Lifetime':  { name: 'Lifetime',     price: 99, durationDays: null, features: ['Lifetime access', 'Any device', 'Unlimited downloads', 'VIP support'] },
+};
+
+const ADMIN_EMAILS = ["admin@gamevault.app"]; // Add your admin emails here
+
+// ─── EMAIL TRANSPORTER ────────────────────────────────────────────────────────
+function createTransporter() {
+  // Uses environment config: firebase functions:config:set mail.user="..." mail.pass="..."
+  const config = functions.config();
+  return nodemailer.createTransport({
+    service: "gmail",
+    auth: {
+      user: config.mail?.user || process.env.MAIL_USER,
+      pass: config.mail?.pass || process.env.MAIL_PASS,
+    },
   });
-
-  
-  function initBg() {
-    const canvas = document.getElementById('bgCanvas');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    let w, h, animId;
-    const particles = [];
-    const PARTICLE_COUNT = 35;
-    const CONNECT_DIST = 100;
-
-    // Skip heavy canvas on mobile/low-end
-    const isMobile = window.innerWidth < 768;
-
-    function resize() {
-      w = canvas.width = window.innerWidth;
-      h = canvas.height = window.innerHeight;
-    }
-    window.addEventListener('resize', resize);
-    resize();
-
-    for (let i = 0; i < PARTICLE_COUNT; i++) {
-      particles.push({
-        x: Math.random() * w,
-        y: Math.random() * h,
-        vx: (Math.random() - 0.5) * 0.3,
-        vy: (Math.random() - 0.5) * 0.3,
-        r: 1 + Math.random()
-      });
-    }
-
-    let skip = 0;
-    function draw() {
-      animId = requestAnimationFrame(draw);
-      skip++;
-      if (skip % 3) return; // run at ~20fps instead of 60
-
-      ctx.clearRect(0, 0, w, h);
-      for (let i = 0; i < particles.length; i++) {
-        const p = particles[i];
-        p.x += p.vx;
-        p.y += p.vy;
-        if (p.x < 0) p.x = w;
-        if (p.x > w) p.x = 0;
-        if (p.y < 0) p.y = h;
-        if (p.y > h) p.y = 0;
-
-        ctx.beginPath();
-        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(45,212,191,0.18)';
-        ctx.fill();
-      }
-
-      if (!isMobile) {
-        for (let i = 0; i < particles.length; i++) {
-          const p = particles[i];
-          for (let j = i + 1; j < particles.length; j++) {
-            const dx = p.x - particles[j].x;
-            const dy = p.y - particles[j].y;
-            if (dx > CONNECT_DIST || dy > CONNECT_DIST) continue;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-            if (dist < CONNECT_DIST) {
-              ctx.beginPath();
-              ctx.moveTo(p.x, p.y);
-              ctx.lineTo(particles[j].x, particles[j].y);
-              ctx.strokeStyle = `rgba(45,212,191,${0.04 * (1 - dist / CONNECT_DIST)})`;
-              ctx.lineWidth = 0.5;
-              ctx.stroke();
-            }
-          }
-        }
-      }
-    }
-
-    // Pause when tab not visible
-    document.addEventListener('visibilitychange', () => {
-      if (document.hidden) { cancelAnimationFrame(animId); }
-      else { draw(); }
-    });
-
-    draw();
-  }
-
-  
-  function uiReady() { document.getElementById('loadingOverlay')?.classList.add('hide'); }
-
-  let _loadingDone = false;
-  let _verificationDone = false;
-  let _detectedTier = null;
-
-  function finishLoading() {
-    _loadingDone = true;
-    if (_verificationDone) uiReady();
-  }
-
-  function onVerificationComplete() {
-    _verificationDone = true;
-    if (_loadingDone) uiReady();
-  }
-
-  function setDetectedTier(tier) { _detectedTier = tier; }
-
-  function grantAccess(expiresAt = null, tier = 'member') {
-    document.getElementById('accessModal').style.display = 'none';
-    document.getElementById('revokedOverlay').classList.remove('show');
-    document.getElementById('protected-content').style.display = 'block';
-    startExpiryTicker(expiresAt);
-    loadGamesFromCatalog();
-    showTierBadge(tier);
-    onVerificationComplete();
-    startVipNotifications();
-    if (tier === 'vip' && typeof initChatBot === 'function') initChatBot();
-  }
-
-  const TIER_STYLES = {
-    member: { label: 'MEMBER', bg: 'linear-gradient(135deg,#10b981,#059669)', color: '#fff' },
-    elite:  { label: 'ELITE', bg: 'linear-gradient(135deg,#8b5cf6,#6d28d9)', color: '#fff' },
-    vip:    { label: 'VIP', bg: 'linear-gradient(135deg,#f59e0b,#ef4444)', color: '#fff' }
-  };
-
-  function showTierBadge(tier) {
-    const el = document.getElementById('userBadge');
-    const cfg = TIER_STYLES[tier] || TIER_STYLES.elite;
-    el.textContent = cfg.label;
-    el.style.background = cfg.bg;
-    el.style.color = cfg.color;
-    el.style.display = 'inline-block';
-
-  }
-
-  function requireCode() {
-    stopLiveListener(); stopExpiryTicker();
-    document.getElementById('protected-content').style.display = 'none';
-    document.getElementById('revokedOverlay').classList.remove('show');
-    document.getElementById('accessModal').style.display = 'flex';
-    document.getElementById('userBadge').style.display = 'none';
-    onVerificationComplete();
-  }
-
-  function showRevoked(reason = 'disabled') {
-    stopLiveListener(); stopExpiryTicker(); revokeLocalAccess();
-    document.getElementById('protected-content').style.display = 'none';
-    document.getElementById('accessModal').style.display = 'none';
-    const titles = { disabled:'Access Paused', deleted:'Code Not Found', expired:'Access Expired' };
-    const msgs   = {
-      disabled:'Your access has been temporarily disabled. Please contact support if you believe this is a mistake.',
-      deleted:'This access code is no longer available or has been removed.',
-      expired:'Your access has expired. You can renew your plan anytime to continue using GameVault.'
-    };
-    document.getElementById('revokedTitle').innerText = titles[reason] || 'Access Paused';
-    const msgEl = document.getElementById('revokedMsg');
-    if (reason === 'expired') {
-      msgEl.innerHTML = 'Your access has expired. No worries — you can renew your plan anytime to continue downloading games on GameVault.';
-    } else {
-      msgEl.innerText = msgs[reason] || msgs.disabled;
-    }
-    document.getElementById('revokedOverlay').classList.add('show');
-    document.getElementById('userBadge').style.display = 'none';
-    onVerificationComplete();
-  }
-
-  function revokeLocalAccess() {
-    localStorage.removeItem(KEY_ACCESS);
-    localStorage.removeItem(KEY_CODE);
-    localStorage.removeItem(KEY_EMAIL);
-    localStorage.removeItem('gv_tier');
-  }
-
-  function startExpiryTicker(expiresAt) {
-    stopExpiryTicker();
-    if (!expiresAt) return;
-    const ticker     = document.getElementById('expiryTicker');
-    const tickerText = document.getElementById('expiryTickerText');
-    ticker.classList.add('show');
-    function update() {
-      const diff = expiresAt - Date.now();
-      if (diff <= 0) { stopExpiryTicker(); showRevoked('expired'); return; }
-      const days    = Math.floor(diff / 86400000);
-      const hours   = Math.floor((diff % 86400000) / 3600000);
-      const minutes = Math.floor((diff % 3600000) / 60000);
-      const seconds = Math.floor((diff % 60000) / 1000);
-      const label   = days > 0
-        ? `Access Remaining: ${days}d ${hours}h ${minutes}m ${seconds}s`
-        : `Access Remaining: ${hours}h ${minutes}m ${seconds}s`;
-      tickerText.textContent = label;
-      ticker.classList.toggle('urgent', diff < 3600000);
-    }
-    update();
-    expiryInterval = setInterval(update, 1000);
-  }
-
-  function stopExpiryTicker() {
-    if (expiryInterval) clearInterval(expiryInterval);
-    const t = document.getElementById('expiryTicker');
-    if (t) t.classList.remove('show','urgent');
-  }
-
-  let statusPollInterval = null;
-
-  function startLiveListener(codeKey) {
-    stopLiveListener();
-    if (!codeKey) return;
-    async function poll() {
-      try {
-        const res = await checkCodeStatusFn({ codeKey });
-        const s = res.data;
-        if (!s.exists) { showRevoked('deleted'); return; }
-        if (s.status === 'disabled') { showRevoked('disabled'); return; }
-        if (s.status === 'expired') { showRevoked('expired'); return; }
-        if (s.expiresAt) startExpiryTicker(s.expiresAt);
-      } catch {}
-    }
-    poll();
-    statusPollInterval = setInterval(poll, 30000);
-  }
-
-  function stopLiveListener() {
-    if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
-  }
-
-  async function verifyCode(rawCode, email = '', silent = false) {
-    const normalized = rawCode.trim().toUpperCase().replace(/-/g, '');
-    if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
-    const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
-    try {
-      const res = await verifyCodeFn({ code: codeKey, email, sessionId: getSessionId() });
-      const result = res.data;
-      if (!result.ok) {
-        if (!silent) showError(result.error || 'Verification failed.');
-        if (result.error && result.error.toLowerCase().includes('not found')) revokeLocalAccess();
-        return { ok: false };
-      }
-      if (!silent && result.expiresAt) document.getElementById('expiryBadge').classList.add('show');
-      _setAccess(result.codeKey);
-      localStorage.setItem(KEY_CODE, result.codeKey);
-      localStorage.setItem('gv_tier', result.tier);
-      if (email) localStorage.setItem(KEY_EMAIL, email.trim().toLowerCase());
-      return { ok: true, codeKey: result.codeKey, expiresAt: result.expiresAt, tier: result.tier };
-    } catch (err) {
-      if (!silent) showError('Verification failed. Please try again.');
-      return { ok: false };
-    }
-  }
-
-  async function handleSubmit() {
-    if (!_checkRL()) { showError('Too many attempts. Please wait a minute.'); return; }
-    const btn  = document.getElementById('verifyAccessBtn');
-    const code = document.getElementById('accessCodeInput').value;
-    const email = document.getElementById('accessEmailInput').value.trim();
-    btn.disabled = true; btn.innerText = 'Verifying...'; showError('');
-    const result = await verifyCode(code, email, false);
-    if (result.ok) { grantAccess(result.expiresAt, result.tier); startLiveListener(result.codeKey); }
-    else { btn.disabled = false; btn.innerText = 'UNLOCK GAMEVAULT'; }
-  }
-
-  /* ════════════════════════════════════════
-     VIP NOTIFICATIONS
-  ════════════════════════════════════════ */
-  let notifUnsubscribe = null;
-  let latestNotifs = [];
-
-  function getReadNotifs() {
-    try {
-      return JSON.parse(localStorage.getItem('gv_read_notifs')) || [];
-    } catch {
-      return [];
-    }
-  }
-
-  function renderNotificationsList() {
-    const listEl = document.getElementById('notifList');
-    const dot = document.querySelector('.notif-dot');
-    const markBtn = document.getElementById('notifMarkRead');
-    if (!listEl) return;
-
-    if (latestNotifs.length === 0) {
-      listEl.innerHTML = '<div class="notif-empty">No notifications</div>';
-      if (dot) dot.classList.remove('show');
-      if (markBtn) markBtn.style.display = 'none';
-      return;
-    }
-
-    const readIds = getReadNotifs();
-    let hasUnread = false;
-
-    listEl.innerHTML = '';
-    latestNotifs.forEach(n => {
-      const isUnread = !readIds.includes(n.id);
-      if (isUnread) hasUnread = true;
-
-      const item = document.createElement('div');
-      item.className = `notif-item ${isUnread ? 'unread' : ''}`;
-
-      let badgeHtml = '';
-      if (isUnread) badgeHtml = `<span class="unread-tag">NEW</span>`;
-
-      const ts = n.created_at;
-      let millis = null;
-      if (typeof ts === 'number') millis = ts;
-      else if (ts && typeof ts.toMillis === 'function') millis = ts.toMillis();
-      else if (ts && typeof ts.seconds === 'number') millis = ts.seconds * 1000;
-      else millis = Date.now();
-
-      item.innerHTML = `
-        <div class="notif-title">${n.title || 'Notification'} ${badgeHtml}</div>
-        <div class="notif-msg">${n.message || ''}</div>
-        <div class="notif-time">${new Date(millis).toLocaleString()}</div>
-      `;
-      listEl.appendChild(item);
-    });
-
-    if (dot) {
-      if (hasUnread) dot.classList.add('show');
-      else dot.classList.remove('show');
-    }
-    if (markBtn) markBtn.style.display = hasUnread ? 'block' : 'none';
-  }
-
-  function markNotifsRead() {
-    const ids = latestNotifs.map(n => n.id);
-    localStorage.setItem('gv_read_notifs', JSON.stringify(ids));
-    renderNotificationsList();
-  }
-
-  function showVipPopUp(n) {
-    const pop = document.createElement('div');
-    pop.className = 'vip-popup';
-    pop.innerHTML = `
-      <div class="vip-popup-icon">👑</div>
-      <div class="vip-popup-body">
-        <div class="vip-popup-title">${n.title || 'VIP Message'}</div>
-        <div class="vip-popup-msg">${n.message || ''}</div>
-      </div>
-      <button class="vip-popup-close">&times;</button>
-    `;
-    document.body.appendChild(pop);
-
-    const closeBtn = pop.querySelector('.vip-popup-close');
-    const closePop = () => {
-      pop.style.animation = 'vipPopOut 0.45s cubic-bezier(0.22,1,0.36,1) forwards';
-      setTimeout(() => pop.remove(), 450);
-    };
-
-    closeBtn.addEventListener('click', closePop);
-    setTimeout(closePop, 10000); // auto close after 10s
-  }
-
-  function stopNotifListener() {
-    if (notifUnsubscribe) { notifUnsubscribe(); notifUnsubscribe = null; }
-  }
-
-  function startVipNotifications() {
-    // Use same tier detection as the games gate (handles gv_tier values reliably)
-    const userTier = getTierFilter();
-    if (userTier !== 'vip') return;
-
-    stopNotifListener();
-
-    const notifsRef = collection(db, 'vip_notifications');
-    const q = query(notifsRef, orderBy('created_at', 'desc'), limit(10));
-
-    notifUnsubscribe = onSnapshot(q, (snapshot) => {
-      const readIds = getReadNotifs();
-      const newNotifs = [];
-      snapshot.forEach(docSnap => {
-        newNotifs.push({ id: docSnap.id, ...docSnap.data() });
-      });
-
-      let shownSession = [];
-      try { shownSession = JSON.parse(sessionStorage.getItem('gv_shown_popups')) || []; } catch {}
-
-      newNotifs.forEach(n => {
-        if (!readIds.includes(n.id) && !shownSession.includes(n.id)) {
-          showVipPopUp(n);
-          shownSession.push(n.id);
-        }
-      });
-      sessionStorage.setItem('gv_shown_popups', JSON.stringify(shownSession));
-
-      latestNotifs = newNotifs;
-      renderNotificationsList();
-    });
-  }
-
-  document.addEventListener('click', e => {
-    const bell = document.getElementById('notifBell');
-    const dd = document.getElementById('notifDropdown');
-    if (bell?.contains(e.target)) {
-      dd.classList.toggle('open');
-    } else if (!dd?.contains(e.target)) {
-      dd?.classList.remove('open');
-    }
-  });
-
-  document.getElementById('notifMarkRead')?.addEventListener('click', markNotifsRead);
-
-  const origGrantAccess = grantAccess;
-  grantAccess = function(expiresAt, tier) {
-    origGrantAccess(expiresAt, tier);
-    startVipNotifications();
-  };
-  let searchTimer;
-  document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('search');
-    if (searchInput) {
-      searchInput.addEventListener('input', e => {
-        const val = e.target.value.toLowerCase();
-        clearTimeout(searchTimer);
-        searchTimer = setTimeout(() => {
-          activeSearch   = val;
-          activeCategory = '';
-          displayedCount = 0;
-          document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
-          document.querySelector('.cat-tab[data-cat=""]')?.classList.add('active');
-          renderGames();
-        }, 200);
-      });
-    }
-  });
-
-  
-  function initLoadParticles() {
-    const c = document.getElementById('loadParticles');
-    if (!c) return;
-    const ctx = c.getContext('2d');
-    let w, h, animId;
-    const particles = [];
-    const count = Math.min(15, Math.floor(window.innerWidth / 80));
-    for (let i = 0; i < count; i++) particles.push({ x: Math.random(), y: Math.random(), vx: (Math.random()-0.5)*0.001, vy: (Math.random()-0.5)*0.001, r: 0.5+Math.random()*0.5 });
-    function resize() { w = c.width = window.innerWidth; h = c.height = window.innerHeight; }
-    window.addEventListener('resize', resize); resize();
-    let skip = 0;
-    function draw() {
-      animId = requestAnimationFrame(draw);
-      skip++; if (skip % 4) return;
-      ctx.clearRect(0, 0, w, h);
-      for (const p of particles) {
-        p.x += p.vx; p.y += p.vy;
-        if (p.x < 0) p.x = 1; if (p.x > 1) p.x = 0;
-        if (p.y < 0) p.y = 1; if (p.y > 1) p.y = 0;
-        ctx.beginPath(); ctx.arc(p.x * w, p.y * h, p.r, 0, Math.PI * 2);
-        ctx.fillStyle = 'rgba(59,130,246,0.1)'; ctx.fill();
-      }
-    }
-    draw();
-  }
-
-  function runLoadSequence() {
-    const bar = document.getElementById('loadBar');
-    const textEls = [document.getElementById('loadText'), document.getElementById('loadText2')];
-    let textIdx = 0;
-    function setLoadText(txt) {
-      const out = textEls[textIdx];
-      const next = textEls[1 - textIdx];
-      out.classList.add('hidden');
-      next.textContent = txt;
-      next.classList.remove('hidden');
-      textIdx = 1 - textIdx;
-    }
-    const dots = document.querySelectorAll('.load-progress-dot');
-    const cards = {
-      member: document.getElementById('tierMember'),
-      elite: document.getElementById('tierElite'),
-      vip: document.getElementById('tierVip'),
-      welcome: document.getElementById('tierWelcome')
-    };
-
-    function showCard(id) {
-      Object.values(cards).forEach(c => c?.classList.remove('show'));
-      if (id && cards[id]) cards[id].classList.add('show');
-    }
-
-    function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
-
-    async function run() {
-      // Phase 1: Initializing
-      setLoadText('Initializing System...');
-      dots[0].classList.add('active');
-      bar.style.width = '18%';
-      await delay(900);
-
-      // Phase 2: Detecting
-      setLoadText('Verifying Membership...');
-      dots[0].classList.remove('active');
-      dots[1].classList.add('active');
-      bar.style.width = '38%';
-      await delay(800);
-
-      // Phase 3: Show tier card if detected
-      const t = _detectedTier;
-      if (t) {
-        showCard(t);
-        const tierTexts = { member: 'Member Access Granted', elite: 'Elite Access Confirmed', vip: 'VIP Access Unlocked' };
-        setLoadText(tierTexts[t] || 'Access Granted');
-        dots[1].classList.remove('active');
-        if (t === 'elite' || t === 'vip') dots[2].classList.add('active');
-        bar.style.width = t === 'vip' ? '82%' : '68%';
-        await delay(t === 'vip' ? 2000 : 1500);
-      }
-
-      // Phase 4: Welcome
-      showCard('welcome');
-      setLoadText('');
-      dots.forEach(d => d.classList.remove('active'));
-      dots[3].classList.add('active');
-      bar.style.width = '100%';
-
-      const welcomeTitle = cards.welcome.querySelector('.load-final-title');
-      if (t === 'elite') welcomeTitle.textContent = 'Elite Access Granted';
-      else if (t === 'vip') welcomeTitle.textContent = 'Welcome, VIP';
-      else welcomeTitle.textContent = 'Welcome to GameVault';
-
-      await delay(1800);
-      localStorage.setItem('gv_welcomed', '1');
-      finishLoading();
-    }
-
-    showCard(null);
-    run();
-  }
-
-  
-  window.addEventListener('DOMContentLoaded', async () => {
-    initBg();
-    initLoadParticles();
-    startTypingAnimation();
-    if (localStorage.getItem('gv_welcomed')) {
-      // Repeat visit — skip animation, just show a quick flash
-      const bar = document.getElementById('loadBar');
-      const text = document.getElementById('loadText');
-      text.textContent = 'Loading...';
-      bar.style.width = '100%';
-      document.querySelectorAll('.load-progress-dot').forEach(d => d.classList.add('active'));
-      setTimeout(finishLoading, 400);
-    } else {
-      runLoadSequence();
-    }
-
-    const savedCode = localStorage.getItem(KEY_CODE);
-    const savedEmail = localStorage.getItem(KEY_EMAIL) || '';
-    const savedTier = localStorage.getItem('gv_tier') || 'member';
-    if (savedCode && _isAccess(savedCode)) {
-      const result = await verifyCode(savedCode, savedEmail, true);
-      if (result.ok) { setDetectedTier(result.tier || savedTier); grantAccess(result.expiresAt, result.tier || savedTier); startLiveListener(result.codeKey); }
-      else requireCode();
-    } else {
-      localStorage.removeItem(KEY_ACCESS);
-      localStorage.removeItem(KEY_CODE);
-      requireCode();
-    }
-
-    document.getElementById('verifyAccessBtn').addEventListener('click', handleSubmit);
-    document.getElementById('accessCodeInput').addEventListener('keydown', e => {
-      if (e.key === 'Enter') handleSubmit();
-    });
-    document.getElementById('accessCodeInput').addEventListener('input', e => {
-      let val = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
-      if (val.length > 4) val = val.substring(0,4)+'-'+val.substring(4);
-      if (val.length > 9) val = val.substring(0,9)+'-'+val.substring(9);
-      e.target.value = val.substring(0,14);
-    });
-
-    // Hamburger menu toggle
-    const hamburger = document.getElementById('nav-hamburger');
-    const mobileNav = document.getElementById('nav-mobile');
-    if (hamburger && mobileNav) {
-      hamburger.addEventListener('click', () => {
-        hamburger.classList.toggle('active');
-        mobileNav.classList.toggle('open');
-      });
-      mobileNav.querySelectorAll('.navbar__mobile-link').forEach(link => {
-        link.addEventListener('click', () => {
-          hamburger.classList.remove('active');
-          mobileNav.classList.remove('open');
-        });
-      });
-    }
-
-
-
-  });
-
-
-</script>
-
-<script>
-function initChatBot() {
-  if (window.__GV_CHAT_LOADED__) return;
-  window.__GV_CHAT_LOADED__ = true;
-
-  document.body.insertAdjacentHTML('beforeend', '<div id="gamevault-chat-root"></div>');
-  var root = document.getElementById("gamevault-chat-root");
-
-  root.innerHTML = `
-    <div id="gvChatBox">
-      <div class="gv-header">
-        <div class="gv-header-avatar"><img src="images/icon2.png" alt="Bot"></div>
-        <div class="gv-header-info">
-          <div class="gv-header-name">GameVault Assistant</div>
-          <div class="gv-header-status">
-            <span class="gv-status-dot"></span> Online — VIP Support
-          </div>
-        </div>
-        <span class="gv-vip-badge">VIP</span>
-        <button id="gvClose" style="background:none;border:none;color:rgba(45,212,191,0.4);font-size:18px;cursor:pointer;padding:4px;border-radius:8px;width:30px;height:30px;display:flex;align-items:center;justify-content:center;margin-left:4px;transition:color 0.2s;" onmouseover="this.style.color='#2dd4bf'" onmouseout="this.style.color='rgba(45,212,191,0.4)'">✕</button>
-      </div>
-      <div class="gv-messages" id="gvMessages"></div>
-      <div class="gv-suggestions" id="gvSuggestions"></div>
-      <div class="gv-input-area">
-        <textarea id="gvInput" rows="1" placeholder="Ask me anything…"></textarea>
-        <button id="gvSend">
-          <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
-        </button>
-      </div>
-    </div>
-    <button id="gvChatBtn" aria-label="Open GameVault chat">
-      <img src="images/icon2.png" alt="Chat">
-    </button>
-  `;
-
-  var btn       = document.getElementById("gvChatBtn");
-  var box       = document.getElementById("gvChatBox");
-  var closeBtn  = document.getElementById("gvClose");
-  var input     = document.getElementById("gvInput");
-  var sendBtn   = document.getElementById("gvSend");
-  var msgs      = document.getElementById("gvMessages");
-  var suggestEl = document.getElementById("gvSuggestions");
-  var welcomed  = false;
-
-  function ts() {
-    return new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  }
-
-  function addMsg(html, type) {
-    var d = document.createElement("div");
-    d.className = "msg " + type;
-    var tsColor = type === 'user' ? 'rgba(255,255,255,0.3)' : 'rgba(45,212,191,0.3)';
-    d.innerHTML = html + '<span class="gv-ts" style="color:' + tsColor + '">' + ts() + '</span>';
-    msgs.appendChild(d);
-    msgs.scrollTop = msgs.scrollHeight;
-    return d;
-  }
-
-  function showTyping() {
-    var el = document.createElement('div');
-    el.className = 'typing-indicator'; el.id = 'gvTyping';
-    el.innerHTML = '<div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div>';
-    msgs.appendChild(el); msgs.scrollTop = msgs.scrollHeight;
-  }
-  function hideTyping() {
-    var el = document.getElementById('gvTyping');
-    if (el) el.remove();
-  }
-
-  var QUICK_SUGGESTIONS = [
-    { label: 'How to download',       query: 'how to download a game' },
-    { label: 'Membership tiers',      query: 'what are the membership plans' },
-    { label: 'Plans and pricing',     query: 'payment plans price' },
-    { label: 'Fix an issue',          query: 'error issue not working' },
-    { label: 'Tell me a fact',        query: 'tell me a fun fact' },
-    { label: 'Game recommendations',  query: 'suggest a game to play' }
-  ];
-
-  var BOT_KB = [
-    {kw:['what is gamevault','gamevault is','about gamevault','whats gamevault','tell me about gamevault','gamevault website','gamevault site','gamevault info'], ans:'<b>GameVault</b> is a premium game downloading platform offering <b>400+ PC games</b> across all genres. Access via access codes, no account needed. Plans start at ₱55 for 2 days, VIP lifetime for ₱99. Fast downloads, safe files, GCash payment.'},
-    {kw:['how gamevault works','how does gamevault work','what does gamevault do','how to use gamevault','gamevault guide','getting started gamevault'], ans:'<b>How GameVault works:</b><br><br>1. Browse 400+ games on our site<br>2. Choose a plan (2-day, 3-day, VIP lifetime)<br>3. Pay via GCash<br>4. Get access code by email<br>5. Enter code to unlock<br>6. Download and play!<br><br>No account needed, no monthly fees.'},
-    {kw:['is gamevault legit','is gamevault real','is gamevault safe','is gamevault legal','is gamevault trusted','gamevault legit','gamevault scam','gamevault fake'], ans:'<b>Yes, GameVault is 100% legit and safe.</b><br><br>• All files scanned for malware<br>• Direct downloads (no torrents)<br>• Secure GCash payments<br>• Thousands of happy users<br>• Active Facebook support<br>• Refund policy within 48 hours'},
-    {kw:['gamevault owner','who owns gamevault','who created gamevault','who made gamevault','gamevault creator','gamevault admin'], ans:'GameVault is managed by a dedicated team of gaming enthusiasts. For direct inquiries, contact us on Facebook.'},
-    {kw:['gamevault price','gamevault cost','gamevault plans','gamevault membership','gamevault subscription','gamevault payment'], ans:'<b>GameVault Plans:</b><br><br>• 2 Days — ₱55 (1 device)<br>• 3 Days — ₱65 (3 devices)<br>• VIP Lifetime — ₱99 (unlimited)<br><br>Pay via GCash only. Code arrives by email within 1-10 minutes.'},
-    {kw:['gamevault games list','gamevault catalog','what games are on gamevault','gamevault available games','gamevault genres','gamevault categories'], ans:'GameVault has <b>400+ games</b> across genres:<br><br>Action, RPG, Racing, Horror, Simulation, Sports, and more.<br><br>Use category tabs or search bar to find specific titles.'},
-    {kw:['gamevault support','gamevault contact','gamevault facebook','gamevault help','gamevault customer service','gamevault email'], ans:'Contact us on Facebook or email <b>gamevault0fficial.ph</b>. Include your GCash reference number for fastest help. VIPs get priority support.'},
-    {kw:['gamevault code','gamevault access code','enter code gamevault','gamevault unlock','gamevault activation'], ans:'After payment, your access code is sent to your <b>email</b> within 1-10 minutes. Format: <code>XXXX-XXXX-XXXX</code>. Enter it on the unlock screen to access all games. Check Spam folder if missing.'},
-    {kw:['gamevault vip','gamevault lifetime','gamevault unlimited','gamevault perks','gamevault benefits'], ans:'<b>VIP Benefits:</b><br><br>• Lifetime access — never expires<br>• Unlimited devices<br>• Priority support<br>• Chatbot assistant access<br><br>Only ₱99 — best value!'},
-    {kw:['download','how to download','install','get game','how do i get','step to download'], ans:'Easy steps:<br>1. Open a game card<br>2. Click DOWNLOAD NOW<br>3. Allow pop-ups<br><br>Done. Need help with a specific game?'},
-    {kw:['access code','code','key','activation','unlock','enter code'], ans:'Code sent to your <b>email</b> after payment.<br>Format: <code>XXXX-XXXX-XXXX</code><br><br>Check Spam folder if missing.<br>VIP codes never expire.'},
-    {kw:['payment','pay','gcash','purchase','buy','plan','price','cost','php','peso'], ans:'We accept <b>GCash</b> only.<br><br>• 2 Days — ₱55 (1 device)<br>• 3 Days — ₱65 (3 devices)<br>• VIP Lifetime — ₱99 (unlimited)<br><br>Code arrives by email within 1-10 min.'},
-    {kw:['member','elite','tier','benefits','membership'], ans:'<b>Membership Tiers</b><br><br><b>Member</b><br>• 2 day access — ₱55<br>• 1 device only<br>• Basic support<br><br><b>Elite</b><br>• 3 day access — ₱65<br>• 3 devices<br>• Priority support<br><br><b>VIP</b><br>• Lifetime access — ₱99<br>• Unlimited devices<br>• Priority support'},
-    {kw:['vip','lifetime','perk','unlimited'], ans:'<b>VIP Benefits</b><br><br>• Lifetime — never expires<br>• Unlimited devices<br>• Priority support<br><br>Only ₱99!'},
-    {kw:['extract','extracting','winrar','rar','zip','how to extract','compress','unzip'], ans:'<b>How to Extract Game Files</b><br><br>Downloaded games come in .rar or .zip format. You need WinRAR to extract them.<br><br>1. Download WinRAR from winrar.com<br>2. Install the program<br>3. Right-click the downloaded file<br>4. Select "Extract Here"<br><br>Done. The game folder will appear and you can run the installer.'},
-    {kw:['game','games','catalog','list','available','titles','library'], ans:'<b>400+ games</b> across genres:<br><br>Action | RPG | Racing<br>Horror | Simulation | Sports<br><br>Use category tabs or search bar to find them.'},
-    {kw:['update','updates','new game','latest','recent','added','patch'], ans:'New games added every week.<br><br>• Check News page for announcements<br>• Visit Updates for patch notes<br>• Watch the Featured row'},
-    {kw:['device','devices','multi','multiple','how many devices','limit'], ans:'<b>Device limits:</b><br><br>• 2 Day Pass — 1 device<br>• 3 Day Pass — 3 devices<br>• VIP — Unlimited<br><br>Tracked automatically per device.'},
-    {kw:['expire','expiry','expiration','how long','duration','days','timer'], ans:'<b>Duration:</b><br><br>• 2 Day Pass — expires in 2 days<br>• 3 Day Pass — expires in 3 days<br>• VIP Lifetime — Never expires<br><br>Timer shown bottom-right corner.'},
-    {kw:['email','not received','didnt get','lost code','resend','no email'], ans:'<b>No code in inbox?</b><br><br>1. Check Spam/Junk folder<br>2. Wait up to 10 min<br>3. Contact us on Facebook with your GCash reference number<br><br>We will sort it out.'},
-    {kw:['error','issue','problem','bug','broken','not working','crash','blank','white screen'], ans:'<b>Quick fixes:</b><br><br>1. Refresh page (F5)<br>2. Clear browser cache<br>3. Use Chrome or Edge<br>4. Allow pop-ups<br>5. Disable ad-blocker<br><br>Still broken? Contact support.'},
-    {kw:['support','help','contact','facebook','admin','assistance','customer service'], ans:'<b>Contact Support</b><br><br>Facebook: GameVault Official page<br>Email: gamevault0fficial.ph<br><br>Include your GCash reference number for fastest help. VIPs get priority.'},
-    {kw:['refund','money back','cancel','return','chargeback'], ans:'Refunds within <b>48 hours</b> of purchase — only if code has not been used.<br><br>Visit Refund Policy page or contact us on Facebook.'},
-    {kw:['privacy','data','secure','safe','information','personal'], ans:'Your data is safe.<br><br>• Only email and code stored locally<br>• No data sold to 3rd parties<br>• Sessions encrypted<br><br>See Privacy Policy for details.'},
-    {kw:['category','genre','filter','browse','sort','search','find game'], ans:'<b>Browse games:</b><br><br>• Category tabs — filter by genre<br>• Search bar — type game name<br>• Featured row — hand-picked games<br>• Most Downloaded — fan favorites'},
-    {kw:['slow','lag','buffering','loading','speed','takes long'], ans:'<b>Slow downloads?</b><br><br>1. Check internet (5+ Mbps)<br>2. Close other tabs<br>3. Try wired connection<br>4. Disable VPN<br>5. Use Chrome or Edge<br><br>Still slow? Message support.'},
-    {kw:['hello','hi','hey','good morning','good evening','sup','yo','good day','howdy','good afternoon'], ans:'Hey! Welcome to GameVault!<br><br>What can I help you with today?<br><br>• Download a game<br>• Access code help<br>• Payment and plans<br>• Fix an issue'},
-    {kw:['thanks','thank you','ty','appreciate','thx','salamat','thank'], ans:'You\'re welcome! Enjoy your games. I\'m always here if you need me.'},
-    {kw:['who are you','what are you','who made you','your name','introduce yourself','about you'], ans:'I\'m the GameVault Assistant — your support bot.<br><br>I help with:<br>• Downloads and games<br>• Codes and accounts<br>• Payments and upgrades<br>• Troubleshooting<br><br>Ask me anything.'},
-    {kw:['renew','extend','upgrade','expired','reactivate'], ans:'<b>Renew or Upgrade</b><br><br>1. Visit Payment page<br>2. Choose plan and pay via GCash<br>3. New code sent by email<br><br>Upgrade to Lifetime VIP (₱99) and never expire.'},
-    {kw:['page','pages','website','site','navigation','where','privacy policy','terms','refund policy','announcement','news','faq page'], ans:'<b>Site Pages</b><br><br>• Home — browse and download<br>• Payment — buy codes via GCash<br>• Updates — new games and patches<br>• FAQ — common questions<br>• Privacy Policy — data handling<br>• Terms of Service — guidelines<br>• Refund Policy — refund rules<br>• Announcements — latest news<br><br>Use navbar links at the top.'},
-    {kw:['account','login','log in','sign in','sign up','register','profile','session'], ans:'No account needed.<br><br>GameVault uses access codes.<br><br>• Enter code on unlock screen<br>• Access stored locally in browser<br>• Use same code on multiple devices<br>• VIP = unlimited devices<br><br>Just enter code and play.'},
-    {kw:['safe','safety','virus','malware','download safe','legit','trust','trustworthy','is it safe'], ans:'Yes, GameVault is safe.<br><br>• All files scanned for malware<br>• Direct downloads (no torrents)<br>• Secure GCash payments<br>• Your data stays private'},
-    {kw:['mobile','phone','android','ios','iphone','tablet','mobile device'], ans:'GameVault works on mobile browsers.<br><br>Fully responsive — browse and download like desktop.<br><br>Note: Most games are PC titles. A desktop is recommended for best experience.'},
-    {kw:['dlc','dlcs','expansion','addon','add-on','extra content','game update'], ans:'Games include latest versions with major DLCs and updates.<br><br>• Check Updates page for patch notes<br>• New DLCs announced in Announcements<br><br>Questions about a specific DLC? Contact support.'},
-    {kw:['member eligible','elite eligible','member chatbot','elite chatbot','member use','elite use','can member use','can elite use','chatbot for member'], ans:'The chatbot assistant is for <b>VIP members only</b>.<br><br>Member and Elite plans include basic support and email support, but do not include this live chatbot assistant.<br><br>Upgrade to VIP (₱99 lifetime) to get unlimited access + priority chatbot support.'},
-    {kw:['faq','frequently asked','common question','quick help'], ans:'<b>Quick FAQ</b><br><br><b>How to download?</b><br>Click DOWNLOAD NOW on a game card.<br><br><b>Where is my code?</b><br>Check email including Spam.<br><br><b>VIP price?</b><br>₱99 lifetime via GCash.<br><br><b>Error?</b><br>Refresh, clear cache, use Chrome.<br><br>Need more? Just ask.'},
-    {kw:['what is the weather','weather','temperature','rain','sunny','cloudy','storm','forecast'], ans:'I don\'t have live weather data access, but you can check weather apps or sites like weather.com for real-time forecasts in your area.'},
-    {kw:['what time is it','current time','time now','what is the date','todays date','date today'], ans:'I can\'t check your system clock directly, but your device shows the time in the taskbar or notification area!'},
-    {kw:['capital of','what is the capital','country capital'], ans:'I can answer that! Here are some: <br>• Philippines — Manila<br>• Japan — Tokyo<br>• USA — Washington D.C.<br>• UK — London<br>• France — Paris<br>• Australia — Canberra<br>• Canada — Ottawa'},
-    {kw:['what is','meaning of','definition','define','explain'], ans:'Could you be more specific? Ask me like "what is RAM" or "define CPU" and I\'ll do my best to explain!'},
-    {kw:['how old are you','your age','when were you made','age'], ans:'I\'m timeless! I was created as a digital assistant for GameVault. No age, no birthday — just here to help 24/7.'},
-    {kw:['do you have feelings','emotions','can you feel','are you alive','conscious'], ans:'Nope! I\'m a smart rule-based assistant — I don\'t have feelings or consciousness. But I\'m designed to be friendly and helpful!'},
-    {kw:['what can you do','capabilities','what do you do','help me','features'], ans:'I can help with:<br>• Game downloads and installs<br>• Payment and membership info<br>• Troubleshooting errors<br>• Answering general questions<br>• Gaming tips and tech help<br><br>Just ask away!'},
-    {kw:['do you like','do you enjoy','your favorite','favourite'], ans:'I don\'t have personal likes or dislikes, but I\'m programmed to help you with whatever you need! Ask me about games, tech, or anything else.'},
-    {kw:['what is gaming','gaming','video game','pc game','console game','gamer'], ans:'Gaming is playing interactive electronic games on devices like PC, console, or mobile. GameVault offers 400+ PC games across all genres!'},
-    {kw:['best game','top game','popular game','recommended game','what game should i play'], ans:'It depends on what you like! Popular genres:<br>• Action — GTA V, Call of Duty<br>• RPG — Skyrim, Witcher 3<br>• Horror — Resident Evil<br>• Racing — Forza, Need for Speed<br><br>Browse our catalog to find your style!'},
-    {kw:['minimum requirements','system requirements','specs','specifications','can my pc run'], ans:'<b>General minimum specs for most games:</b><br>• OS: Windows 10<br>• CPU: Intel i5 or AMD Ryzen 3<br>• RAM: 8GB<br>• GPU: GTX 1050 or equivalent<br>• Storage: Varies per game (20-100GB)<br><br>Check each game card for specific requirements.'},
-    {kw:['fps','frames per second','low fps','laggy','stutter','smooth','performance'], ans:'<b>To improve FPS:</b><br>1. Lower graphics settings<br>2. Update GPU drivers<br>3. Close background apps<br>4. Lower resolution<br>5. Enable performance mode in Windows'},
-    {kw:['crack','cracked game','pirate','piracy','illegal'], ans:'GameVault provides game access through our service. All games are properly sourced and safe to download.'},
-    {kw:['multiplayer','online game','co-op','multi player','play with friends'], ans:'Many games on GameVault support multiplayer! Check the game description to see if it has online or local co-op features.'},
-    {kw:['save game','save file','game save','progress','saved data'], ans:'Game saves are stored locally on your device, usually in Documents/My Games or AppData. Always back up your saves before reinstalling!'},
-    {kw:['mod','mods','modding','custom content','game mod'], ans:'Many PC games support mods! Popular modding communities include Nexus Mods and Steam Workshop. Check if your game has mod support before installing.'},
-    {kw:['controller','gamepad','xbox controller','playstation controller','dual shock','joystick'], ans:'Most PC games support Xbox and PlayStation controllers. Connect via USB or Bluetooth. Some games may need additional setup in settings.'},
-    {kw:['steam','epic games','origin','game launcher','launcher'], ans:'GameVault games work independently — no Steam or other launchers needed! Just download, extract, and play.'},
-    {kw:['what is cpu','processor','central processing unit','intel','amd','ryzen','core i'], ans:'The CPU (Central Processing Unit) is the brain of your computer. It handles all calculations and instructions. Popular brands: Intel (Core i3/i5/i7/i9) and AMD (Ryzen 3/5/7/9).'},
-    {kw:['what is gpu','graphics card','video card','nvidia','geforce','rtx','gtx','amd radeon'], ans:'The GPU (Graphics Processing Unit) handles rendering images, video, and games. Popular brands: NVIDIA (GTX/RTX series) and AMD (Radeon series). Essential for gaming!'},
-    {kw:['what is ram','memory','random access memory','how much ram'], ans:'RAM (Random Access Memory) is your computer\'s short-term memory. It stores data for active tasks. For gaming, 8GB is minimum, 16GB is recommended, 32GB for heavy workloads.'},
-    {kw:['what is ssd','hard drive','storage','hdd','solid state drive'], ans:'An SSD (Solid State Drive) is faster than a traditional HDD (Hard Disk Drive). SSDs make your computer boot faster and games load quicker. Recommended for gaming!'},
-    {kw:['windows','operating system','os','windows 10','windows 11'], ans:'Windows is Microsoft\'s operating system. Windows 10 and 11 are the most common for gaming. GameVault games require Windows to run.'},
-    {kw:['internet speed','wifi','ethernet','broadband','connection','mbps'], ans:'For gaming: minimum 5 Mbps download speed. For smooth streaming: 15+ Mbps. Use wired Ethernet for the best connection, or 5GHz WiFi.'},
-    {kw:['vpn','virtual private network','proxy'], ans:'A VPN hides your IP and encrypts your traffic. It can help with privacy and accessing region-locked content, but may slow down download speeds.'},
-    {kw:['browser','chrome','edge','firefox','opera','safari'], ans:'For the best GameVault experience, use <b>Chrome</b> or <b>Edge</b>. Make sure pop-ups are allowed and ad-blocker is disabled for our site.'},
-    {kw:['virus','antivirus','windows defender','malwarebytes','security'], ans:'Windows Defender (built into Windows) is good basic protection. For extra safety, use Malwarebytes or Bitdefender. GameVault files are scanned and safe.'},
-    {kw:['what is ai','artificial intelligence','machine learning','deep learning'], ans:'AI (Artificial Intelligence) lets computers learn and make decisions. Examples: chatbots (like me), image recognition, self-driving cars, and game NPCs.'},
-    {kw:['what is bitcoin','cryptocurrency','crypto','blockchain','ethereum'], ans:'Bitcoin is a digital currency that uses blockchain technology. It\'s decentralized (no bank controls it). Other popular ones: Ethereum, Solana, USDT.'},
-    {kw:['what is coding','programming','software development','programming language','python','javascript','html'], ans:'Coding is writing instructions for computers. Popular languages: Python (beginners, AI), JavaScript (web), C++ (games), HTML/CSS (websites). GameVault is built with HTML, CSS, and JavaScript!'},
-    {kw:['how are you','how do you do','you good','whats up','what\'s up','sup'], ans:'I\'m doing great, thanks for asking! How can I help you today?'},
-    {kw:['good morning','good afternoon','good evening'], ans:'Good day! Hope you\'re having a great one. What can I help you with?'},
-    {kw:['bye','goodbye','see you','later','gtg','gotta go','talk later'], ans:'Take care! If you ever need help, I\'m just a click away. Enjoy your games!'},
-    {kw:['joke','funny','laugh','humor','make me laugh'], ans:'Why do gamers always win arguments?<br><br>Because they have the fastest comebacks!<br><br>Want another one?'},
-    {kw:['another joke','tell me another','more jokes'], ans:'Why did the game developer go broke?<br><br>Because they used up all their cache!'},
-    {kw:['you are funny','you are cool','i like you','you are great','you are awesome'], ans:'Thanks! I\'m here to help and hopefully make your day a little better.'},
-    {kw:['you are stupid','you are dumb','you suck','bad bot','useless'], ans:'Sorry I couldn\'t meet your expectations! I\'m always learning. Try rephrasing your question or contact support if you need human help.'},
-    {kw:['what is your purpose','why do you exist','reason you exist'], ans:'My purpose is to assist GameVault users with downloads, payments, troubleshooting, and general questions — making your experience smooth and fun!'},
-    {kw:['are you human','are you a robot','real person','am i talking to a human'], ans:'I\'m a chatbot assistant — not human! But I\'m designed to sound friendly and natural. For complex issues, a human admin can help via our Facebook page.'},
-    {kw:['what is 2+2','simple math','addition','subtraction','multiplication','division','math problem','calculate'], ans:'I can help with basic math! I don\'t have a built-in calculator, but you can ask simple questions or use your device calculator for complex ones.'},
-    {kw:['tell me a fact','interesting fact','fun fact','did you know','trivia'], ans:'Did you know?<br><br>The first video game ever created was "Tennis for Two" in 1958!<br><br>The first computer virus was created in 1983.<br><br>The world\'s first website is still online!'},
-    {kw:['another fact','more facts','tell me something'], ans:'Here\'s another:<br><br>The first smartphone was IBM\'s Simon in 1992.<br><br>"Minecraft" is the best-selling game of all time (over 300M copies).<br><br>The first 1GB hard drive (1980) weighed 250kg and cost $40,000!'},
-    {kw:['how many','how much','count','number of'], ans:'Could you be more specific? Ask me like "how many games are on GameVault" (400+) or "how much does VIP cost" (₱99 lifetime).'},
-    {kw:['what is love','meaning of love','define love'], ans:'Love is a complex emotion and feeling of deep affection. In the context of gaming — we love games! And GameVault loves its users.'},
-    {kw:['meaning of life','life purpose','why are we here','42'], ans:'The meaning of life? Some say 42 (Hitchhiker\'s Guide reference). Others say it\'s about happiness, connection, and enjoying the journey. Also — gaming!'},
-    {kw:['computer slow','pc slow','laptop slow','slow performance'], ans:'<b>Speed up your PC:</b><br>1. Restart your computer<br>2. Close unused programs<br>3. Clear temporary files (Disk Cleanup)<br>4. Disable startup programs<br>5. Check for viruses<br>6. Upgrade RAM or SSD'},
-    {kw:['internet not working','no internet','wifi not connecting','offline','cannot connect'], ans:'<b>Fix internet issues:</b><br>1. Restart your router (wait 30s)<br>2. Run network troubleshooter<br>3. Check cables<br>4. Forget and reconnect to WiFi<br>5. Restart your device'},
-    {kw:['screen goes black','black screen','display not working','no display','monitor not working'], ans:'<b>For black screen:</b><br>1. Press Win+Ctrl+Shift+B (reset graphics)<br>2. Check monitor cables<br>3. Restart in Safe Mode<br>4. Update GPU drivers<br>5. Reconnect monitor'},
-    {kw:['blue screen','blue screen of death','bsod','windows error','system crash'], ans:'A Blue Screen (BSOD) is a Windows crash. Common fixes:<br>1. Restart your PC<br>2. Update drivers<br>3. Check for Windows updates<br>4. Run "sfc /scannow" in Command Prompt<br>5. Check RAM with Windows Memory Diagnostic'},
-    {kw:['forgot password','reset password','lost password','password recovery'], ans:'Since GameVault uses access codes (not passwords), check your email for your code. If lost, contact us on Facebook with your GCash reference.'},
-    {kw:['ads','adblock','ad blocker','pop up','popup blocker'], ans:'<b>For GameVault to work properly:</b><br>1. Disable ad-blocker on our site<br>2. Allow pop-ups from GameVault<br>3. Whitelist our site in your blocker<br><br>This is needed for download links to work!'},
-    {kw:['study tips','how to study','study better','focus','concentrate','productivity'], ans:'<b>Study tips:</b><br>1. Take breaks every 25-30 min (Pomodoro)<br>2. Find a quiet space<br>3. Turn off phone notifications<br>4. Rewrite notes by hand<br>5. Teach someone else<br>6. Stay hydrated!'},
-    {kw:['exercise','workout','fitness','gym','health','healthy'], ans:'<b>Quick tips:</b><br>• Take breaks from gaming to stretch<br>• Stay hydrated<br>• 30 min of exercise daily<br>• Good posture while gaming<br>• Eye breaks every 20 min (look away from screen)'},
-    {kw:['food','recipe','cooking','eat','hungry','dinner','lunch','breakfast'], ans:'I can\'t cook for you (yet!), but staying hydrated and eating well helps your gaming performance! Try not to game on an empty stomach.'},
-    {kw:['sleep','insomnia','cant sleep','tired','fatigue','rest'], ans:'Good sleep is important! <br>• Avoid screens 30 min before bed<br>• Keep a regular schedule<br>• Don\'t game right before sleeping<br>• Aim for 7-8 hours'},
-    {kw:['movie','film','watch','cinema','netflix'], ans:'I\'m more of a gaming expert! But popular game-to-movie adaptations include The Last of Us, Sonic, and Super Mario. Ask me about games instead!'},
-    {kw:['music','song','playlist','listen','spotify'], ans:'Many games have amazing soundtracks! Try listening to game OSTs (Original Soundtracks) from The Witcher, GTA, or DOOM for epic vibes.'},
-    {kw:['anime','manga','japanese animation'], ans:'Anime and gaming go hand-in-hand! Popular game-anime crossovers include Genshin Impact, Persona, and Dragon Ball games. Check them out on GameVault!'},
-    {kw:['discord','server','community','chat group'], ans:'GameVault doesn\'t have a Discord server. For support, contact us on Facebook.'},
-    {kw:['facebook','messenger','social media','instagram','twitter','tiktok'], ans:'You can reach GameVault support on <b>Facebook</b>. That\'s our main support channel!'},
-    {kw:['toxic','toxic players','bad teammate','report player','harassment'], ans:'We believe in a positive gaming community. If you encounter toxic behavior, don\'t engage — mute, block, and report when possible.'},
-    {kw:['game recommendation','what game','suggest game','game suggestion'], ans:'<b>Try these based on your mood:</b><br>🔥 Action — GTA V, Red Dead Redemption<br>👻 Horror — Resident Evil, Silent Hill<br>🏎️ Racing — Forza Horizon, Need for Speed<br>🎮 RPG — Skyrim, The Witcher 3<br><br>Browse GameVault for 400+ titles!'},
-    {kw:['best graphics game','beautiful game','nice visuals','realistic game'], ans:'Games with amazing graphics:<br>• Red Dead Redemption 2<br>• Cyberpunk 2077<br>• Forza Horizon 5<br>• Call of Duty: Modern Warfare<br>• Microsoft Flight Simulator'},
-    {kw:['retro game','classic game','old game','vintage','nostalgia'], ans:'Classic games that defined gaming:<br>• Super Mario (1985)<br>• Doom (1993)<br>• Final Fantasy VII (1997)<br>• Half-Life (1998)<br>• GTA III (2001)<br><br>Some are available on GameVault!'},
-    {kw:['stress','anxious','stress relief','relax','calm'], ans:'Gaming can be a great stress reliever! Try relaxing games like Stardew Valley, Minecraft (peaceful mode), or simulation games. Also remember to take breaks and breathe!'},
-    {kw:['software','software download','how to download software','install software','software install','software step','software guide','how to install software','adobe','photoshop','premiere','after effects','microsoft office','vmware'], ans:'<b>How to Download & Install Software:</b><br><br>1. Click <b>Download</b> on the software page<br>2. Wait for the download to finish<br>3. Extract the ZIP file (password: <b>123</b>)<br>4. <b>Turn off</b> your antivirus temporarily<br>5. Run the <b>.exe</b> file<br>6. Follow the installation steps<br><br>Done! Enjoy your software. 🎉<br><br>📺 Want a video guide? Message <b>Gamevault0fficial</b> on Facebook to get the full step-by-step video.'},
-  ];
-
-  function tokenize(s) { return s.toLowerCase().replace(/[^a-z0-9\s]/g,'').split(/\s+/).filter(Boolean); }
-
-  function findAnswer(q) {
-    var query = q.toLowerCase().trim();
-    if (!query) return null;
-    var tokens = tokenize(query);
-    if (tokens.length === 0) return null;
-    var best = null, bestScore = 0;
-    for (var i = 0; i < BOT_KB.length; i++) {
-      var item = BOT_KB[i];
-      var score = 0, matchedKws = 0;
-      for (var j = 0; j < item.kw.length; j++) {
-        var kw = item.kw[j].toLowerCase();
-        if (query.indexOf(kw) !== -1) { score += kw.length * 3; matchedKws++; }
-        var kwTokens = tokenize(kw), matchCount = 0;
-        for (var t = 0; t < kwTokens.length; t++) {
-          for (var u = 0; u < tokens.length; u++) {
-            if (tokens[u] === kwTokens[t]) { matchCount++; break; }
-            if (kwTokens[t].length > 3 && tokens[u].length > 3 && (tokens[u].indexOf(kwTokens[t]) !== -1 || kwTokens[t].indexOf(tokens[u]) !== -1)) { matchCount++; break; }
-          }
-        }
-        if (kwTokens.length > 0) score += matchCount * (matchCount / kwTokens.length) * 12;
-      }
-      if (score > bestScore) { bestScore = score; best = item; }
-    }
-    if (best && bestScore > 4) return best.ans;
-    if (/^(what|how|why|when|where|who|which|can|do|does|is|are|will|would|should|could)/.test(tokens[0])) return 'That\'s a great question! I don\'t have a specific answer for that in my knowledge base. Try asking differently or contact support for more help.';
-    if (tokens.length <= 2) return 'Could you give me more details? Ask me a full question and I\'ll do my best to help!';
-    return null;
-  }
-
-  function chipsFor(q) {
-    q = q.toLowerCase();
-    var c = [];
-    if (/download|install|game|library|catalog/.test(q)) c.push('Browse games');
-    if (/code|key|access|activation/.test(q))           c.push('Go to Payment');
-    if (/error|bug|issue|crash|broken|white.?screen/.test(q)) c.push('Refresh & retry');
-    if (/vip|benefit|lifetime|unlimited/.test(q))       c.push('My VIP perks');
-    if (/pay|price|cost|gcash|plan|upgrade/.test(q))    c.push('View plans');
-    if (/support|help|contact|facebook/.test(q))        c.push('Contact support');
-    if (/page|site|website|navigation|privacy|terms/.test(q)) c.push('Browse games');
-    if (/safe|virus|malware|trust/.test(q))             c.push('View plans');
-    if (/mobile|phone|android/.test(q))                 c.push('Browse games');
-    if (/fact|trivia|know/.test(q))                     c.push('Tell me a fact');
-    if (/joke|funny|laugh/.test(q))                     c.push('Tell me a joke');
-    if (/game|recommend|suggest|play/.test(q))          c.push('Suggest a game');
-    if (!c.length) c = ['Browse games', 'View plans', 'Contact support'];
-    return c.slice(0, 3);
-  }
-
-  function showChips(chips) {
-    var div = document.createElement('div');
-    div.className = 'gv-chips';
-    chips.forEach(function(label) {
-      var b = document.createElement('button');
-      b.textContent = label;
-      b.onclick = function() { input.value = label; doSend(); };
-      div.appendChild(b);
-    });
-    msgs.appendChild(div);
-    msgs.scrollTop = msgs.scrollHeight;
-  }
-
-  var fallbacks = [
-    'Hmm, not sure about that one. Try asking differently or contact us on Facebook and we will help.',
-    'I don\'t have an answer for that yet. Try rephrasing, or tap Contact support below.',
-    'Interesting question! That\'s outside my knowledge base. Try asking about games, downloads, tech, or gaming tips!',
-    'I\'m still learning! For now, try asking about GameVault features, gaming tips, or tech help. I\'m best at those topics!'
-  ];
-  function botReply(query) {
-    var answer = findAnswer(query);
-    if (!answer) answer = fallbacks[Math.floor(Math.random() * fallbacks.length)];
-    addMsg(answer, 'bot');
-    showChips(chipsFor(query));
-  }
-
-  function doSend() {
-    var t = input.value.trim();
-    if (!t) return;
-    input.value = ''; input.style.height = 'auto';
-    addMsg(t, 'user');
-    sendBtn.disabled = true;
-    showTyping();
-    var delay = 1200 + Math.random() * 1800;
-    setTimeout(function() {
-      hideTyping();
-      botReply(t);
-      sendBtn.disabled = false;
-    }, delay);
-  }
-
-  function showWelcome() {
-    if (welcomed) return;
-    welcomed = true;
-    addMsg('Hey! Welcome to GameVault! I\'m your assistant — ask me anything about downloads, plans, or issues.', 'bot');
-    suggestEl.innerHTML = '';
-    QUICK_SUGGESTIONS.forEach(function(s) {
-      var b = document.createElement('button');
-      b.textContent = s.label;
-      b.onclick = function() { input.value = s.query; doSend(); };
-      suggestEl.appendChild(b);
-    });
-  }
-
-  function togglePanel() {
-    if (box.classList.contains('open')) {
-      closePanel();
-    } else {
-      box.classList.add('open'); btn.classList.add('open');
-      if (!msgs.querySelector('.msg')) setTimeout(showWelcome, 320);
-      setTimeout(function() { input.focus(); }, 360);
-    }
-  }
-  function closePanel() {
-    box.classList.remove('open'); btn.classList.remove('open');
-  }
-
-  btn.onclick      = togglePanel;
-  closeBtn.onclick = closePanel;
-  sendBtn.onclick  = doSend;
-  input.addEventListener('keydown', function(e) {
-    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); doSend(); }
-  });
-  input.addEventListener('input', function() {
-    input.style.height = 'auto';
-    input.style.height = Math.min(input.scrollHeight, 100) + 'px';
-  });
-  document.addEventListener('keydown', function(e) {
-    if (e.key === 'Escape' && box.classList.contains('open')) closePanel();
-  });
-  document.addEventListener('click', function(e) {
-    if (box.classList.contains('open') && !box.contains(e.target) && e.target !== btn) closePanel();
-  });
-
 }
-</script>
 
+// ─── HELPER FUNCTIONS ─────────────────────────────────────────────────────────
+function generateSecureCode() {
+  const chars = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code = "";
+  const bytes = crypto.randomBytes(12);
+  for (let i = 0; i < 12; i++) {
+    if (i === 4 || i === 8) code += "-";
+    code += chars[bytes[i] % chars.length];
+  }
+  return code;
+}
+
+function generateTransactionId() {
+  return "TXN-" + Date.now() + "-" + crypto.randomBytes(4).toString("hex").toUpperCase();
+}
+
+async function logAdminAction(action, details, adminEmail = "system") {
+  await db.collection("admin_logs").add({
+    action,
+    details,
+    performed_by: adminEmail,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(),
+    ip: details.ip || null,
+  });
+}
+
+async function sendActivationEmail(toEmail, code, plan, transactionId) {
+  const planInfo = PLANS[plan];
+  const transporter = createTransporter();
+
+  const expiryText = planInfo.durationDays
+    ? `Valid for ${planInfo.durationDays} days from activation`
+    : "Lifetime access — never expires";
+
+  const featureList = planInfo.features.map(f => `<li style="margin:6px 0;">✅ ${f}</li>`).join("");
+
+  const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background:#0a0d14;font-family:'Segoe UI',Arial,sans-serif;">
+  <div style="max-width:560px;margin:40px auto;background:#13172a;border-radius:16px;overflow:hidden;border:1px solid #2a2f4a;">
+    <div style="background:linear-gradient(135deg,#6c63ff,#ff6b9d);padding:32px;text-align:center;">
+      <h1 style="color:white;margin:0;font-size:28px;letter-spacing:2px;">🎮 GAME VAULT</h1>
+      <p style="color:rgba(255,255,255,0.85);margin:8px 0 0;font-size:14px;">Your activation is ready</p>
+    </div>
+    <div style="padding:32px;">
+      <p style="color:#b9c3e0;margin:0 0 24px;">Hi there! Your payment has been confirmed. Here's your activation code:</p>
+
+      <div style="background:#0a0d14;border:2px dashed #6c63ff;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px;">
+        <p style="color:#8b8fa8;font-size:12px;margin:0 0 8px;letter-spacing:2px;text-transform:uppercase;">Activation Code</p>
+        <p style="color:#fff;font-size:28px;font-weight:900;margin:0;letter-spacing:4px;font-family:monospace;">${code}</p>
+      </div>
+
+      <div style="background:#1a1e30;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <p style="color:#6c63ff;font-weight:700;margin:0 0 12px;font-size:14px;text-transform:uppercase;letter-spacing:1px;">
+          ${planInfo.name} Plan — ₱${planInfo.price}
+        </p>
+        <p style="color:#8b8fa8;font-size:13px;margin:0 0 12px;">${expiryText}</p>
+        <ul style="color:#b9c3e0;font-size:13px;padding-left:0;list-style:none;margin:0;">${featureList}</ul>
+      </div>
+
+      <div style="background:#1a1e30;border-radius:10px;padding:16px;margin-bottom:24px;">
+        <p style="color:#8b8fa8;font-size:12px;margin:0 0 6px;text-transform:uppercase;letter-spacing:1px;">How to activate</p>
+        <ol style="color:#b9c3e0;font-size:13px;padding-left:18px;margin:0;">
+          <li style="margin:4px 0;">Go to gamevault.app/activate</li>
+          <li style="margin:4px 0;">Enter your code above</li>
+          <li style="margin:4px 0;">Enjoy your ${planInfo.name} access!</li>
+        </ol>
+      </div>
+
+      <p style="color:#5a6070;font-size:11px;margin:0;border-top:1px solid #2a2f4a;padding-top:16px;">
+        Transaction ID: ${transactionId} · Keep this email for your records. 
+        Do not share your code with others.
+      </p>
+    </div>
+  </div>
 </body>
-</html>
+</html>`;
+
+  await transporter.sendMail({
+    from: `"GameVault" <${functions.config().mail?.user || process.env.MAIL_USER}>`,
+    to: toEmail,
+    subject: `🎮 GameVault — Your ${planInfo.name} Activation Code`,
+    html,
+  });
+}
+
+// ─── CALLABLE: INITIATE PAYMENT ───────────────────────────────────────────────
+// Called from frontend when user selects a plan and provides email
+exports.initiatePayment = functions.https.onCall(async (data, context) => {
+  const { email, plan } = data;
+
+  if (!email || !plan || !PLANS[plan]) {
+    throw new functions.https.HttpsError("invalid-argument", "Invalid email or plan.");
+  }
+
+  // Fraud check: max 3 pending payments per email per hour
+  const oneHourAgo = new Date(Date.now() - 3600000);
+  const recentSnap = await db.collection("payments")
+    .where("email", "==", email)
+    .where("status", "==", "pending")
+    .where("created_at", ">", oneHourAgo)
+    .get();
+
+  if (recentSnap.size >= 3) {
+    throw new functions.https.HttpsError("resource-exhausted", "Too many pending payments. Please wait or contact support.");
+  }
+
+  const transactionId = generateTransactionId();
+  const planInfo = PLANS[plan];
+
+  const paymentRef = db.collection("payments").doc(transactionId);
+  await paymentRef.set({
+    transaction_id: transactionId,
+    email: email.toLowerCase().trim(),
+    plan,
+    amount: planInfo.price,
+    status: "pending",
+    created_at: admin.firestore.FieldValue.serverTimestamp(),
+    expires_at: new Date(Date.now() + 30 * 60000), // 30-min window to pay
+    code_generated: false,
+    ip: context.rawRequest?.ip || null,
+    verification_attempts: 0,
+  });
+
+  await logAdminAction("payment_initiated", {
+    transaction_id: transactionId,
+    email,
+    plan,
+    amount: planInfo.price,
+  });
+
+  // Return minimal info to frontend — no sensitive data
+  return {
+    transactionId,
+    plan: planInfo.name,
+    amount: planInfo.price,
+    gcashNumber: functions.config().gcash?.number || "09XX-XXX-XXXX", // Set via: firebase functions:config:set gcash.number="09..."
+    gcashName: functions.config().gcash?.name || "GameVault",
+    expiresInMinutes: 30,
+  };
+});
+
+// ─── CALLABLE: VERIFY PAYMENT (Admin-triggered or webhook) ───────────────────
+// This is called ONLY by your webhook receiver or by an admin — NEVER by the paying user
+exports.verifyAndFulfillPayment = functions.https.onCall(async (data, context) => {
+  // Must be called with admin auth token
+  if (!context.auth) {
+    throw new functions.https.HttpsError("unauthenticated", "Must be authenticated.");
+  }
+
+  // Check admin claim
+  const callerToken = context.auth.token;
+  if (!callerToken.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const { transactionId, referenceNumber, confirmedAmount } = data;
+
+  if (!transactionId) {
+    throw new functions.https.HttpsError("invalid-argument", "Transaction ID required.");
+  }
+
+  return await db.runTransaction(async (t) => {
+    const payRef = db.collection("payments").doc(transactionId);
+    const paySnap = await t.get(payRef);
+
+    if (!paySnap.exists) {
+      throw new functions.https.HttpsError("not-found", "Transaction not found.");
+    }
+
+    const payment = paySnap.data();
+
+    if (payment.status === "paid") {
+      return { success: true, message: "Already processed.", code: payment.activation_code };
+    }
+    if (payment.status === "cancelled") {
+      throw new functions.https.HttpsError("failed-precondition", "Transaction was cancelled.");
+    }
+
+    // Verify amount matches
+    if (confirmedAmount && confirmedAmount !== payment.amount) {
+      await t.update(payRef, {
+        status: "amount_mismatch",
+        flagged: true,
+        reference_number: referenceNumber,
+        verified_at: admin.firestore.FieldValue.serverTimestamp(),
+      });
+      throw new functions.https.HttpsError("failed-precondition", `Amount mismatch: expected ₱${payment.amount}, got ₱${confirmedAmount}`);
+    }
+
+    // Generate unique activation code (ensure uniqueness)
+    let code;
+    let attempts = 0;
+    do {
+      code = generateSecureCode();
+      const existing = await db.collection("codes").doc(code).get();
+      if (!existing.exists) break;
+      attempts++;
+    } while (attempts < 5);
+
+    if (attempts >= 5) {
+      throw new functions.https.HttpsError("internal", "Failed to generate unique code.");
+    }
+
+    const planInfo = PLANS[payment.plan];
+    const expiresAt = planInfo.durationDays
+      ? new Date(Date.now() + planInfo.durationDays * 86400000)
+      : null;
+
+    // Create the activation code
+    const codeRef = db.collection("codes").doc(code);
+    t.set(codeRef, {
+      status: "unused",
+      plan: payment.plan,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      created_by: "payment_automation",
+      transaction_id: transactionId,
+      email: payment.email,
+      used_by_session: null,
+      used_at: null,
+      expires_at: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
+    });
+
+    // Update payment record
+    t.update(payRef, {
+      status: "paid",
+      activation_code: code,
+      reference_number: referenceNumber || null,
+      confirmed_amount: confirmedAmount || payment.amount,
+      code_generated: true,
+      verified_at: admin.firestore.FieldValue.serverTimestamp(),
+      verified_by: context.auth.uid,
+    });
+
+    // Log it
+    await logAdminAction("payment_verified", {
+      transaction_id: transactionId,
+      email: payment.email,
+      plan: payment.plan,
+      amount: payment.amount,
+      code,
+      reference_number: referenceNumber,
+    }, callerToken.email || context.auth.uid);
+
+    // Update revenue stats
+    const statsRef = db.collection("admin_stats").doc("revenue");
+    t.set(statsRef, {
+      [`revenue_${payment.plan}`]: admin.firestore.FieldValue.increment(payment.amount),
+      total_revenue: admin.firestore.FieldValue.increment(payment.amount),
+      total_paid: admin.firestore.FieldValue.increment(1),
+      last_updated: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return { success: true, code, email: payment.email };
+  }).then(async (result) => {
+    // Send email outside transaction
+    if (result.success && result.code) {
+      try {
+        const paySnap = await db.collection("payments").doc(transactionId).get();
+        await sendActivationEmail(result.email, result.code, paySnap.data().plan, transactionId);
+        await db.collection("payments").doc(transactionId).update({ email_sent: true, email_sent_at: admin.firestore.FieldValue.serverTimestamp() });
+      } catch (emailErr) {
+        console.error("Email send failed:", emailErr);
+        // Don't fail the whole operation — log it
+        await db.collection("admin_logs").add({
+          action: "email_failed",
+          details: { transaction_id: transactionId, error: emailErr.message },
+          timestamp: admin.firestore.FieldValue.serverTimestamp(),
+        });
+      }
+    }
+    return result;
+  });
+});
+
+// ─── CALLABLE: ADMIN CODE MANAGEMENT ─────────────────────────────────────────
+exports.adminGenerateCode = functions.https.onCall(async (data, context) => {
+  if (!context.auth?.token?.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const { plan = "basic", expiryDays = null, count = 1 } = data;
+  const safeCount = Math.min(50, Math.max(1, count));
+  const codes = [];
+
+  for (let i = 0; i < safeCount; i++) {
+    let code;
+    let attempts = 0;
+    do {
+      code = generateSecureCode();
+      const existing = await db.collection("codes").doc(code).get();
+      if (!existing.exists) break;
+      attempts++;
+    } while (attempts < 5);
+
+    const expiresAt = expiryDays ? new Date(Date.now() + expiryDays * 86400000) : null;
+
+    await db.collection("codes").doc(code).set({
+      status: "unused",
+      plan,
+      created_at: admin.firestore.FieldValue.serverTimestamp(),
+      created_by: context.auth.token.email || context.auth.uid,
+      transaction_id: null,
+      email: null,
+      used_by_session: null,
+      used_at: null,
+      expires_at: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
+    });
+
+    codes.push(code);
+  }
+
+  await logAdminAction("codes_generated_manual", {
+    count: safeCount, plan, expiryDays, codes,
+  }, context.auth.token.email || context.auth.uid);
+
+  return { success: true, codes };
+});
+
+exports.adminToggleCode = functions.https.onCall(async (data, context) => {
+  if (!context.auth?.token?.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const { codeId } = data;
+  const codeRef = db.collection("codes").doc(codeId);
+  const snap = await codeRef.get();
+  if (!snap.exists) throw new functions.https.HttpsError("not-found", "Code not found.");
+
+  const current = snap.data().status;
+  const newStatus = current === "disabled" ? "unused" : "disabled";
+  await codeRef.update({ status: newStatus, toggled_by: context.auth.token.email, toggled_at: admin.firestore.FieldValue.serverTimestamp() });
+
+  await logAdminAction("code_toggled", { codeId, from: current, to: newStatus }, context.auth.token.email);
+  return { success: true, newStatus };
+});
+
+exports.adminDeleteCode = functions.https.onCall(async (data, context) => {
+  if (!context.auth?.token?.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const { codeId } = data;
+  await db.collection("codes").doc(codeId).delete();
+  await logAdminAction("code_deleted", { codeId }, context.auth.token.email);
+  return { success: true };
+});
+
+// ─── CALLABLE: SET ADMIN CLAIM ────────────────────────────────────────────────
+// Run once during setup using the Firebase console or a secure script
+exports.setAdminClaim = functions.https.onCall(async (data, context) => {
+  // Only existing admins or during initial setup (check Firestore for bootstrap flag)
+  const bootstrapRef = db.collection("admin_stats").doc("bootstrap");
+  const bootstrap = await bootstrapRef.get();
+
+  if (!bootstrap.exists || !bootstrap.data().initialized) {
+    // First-time setup
+    const { uid, secret } = data;
+    const configSecret = functions.config().admin?.setup_secret;
+    if (!configSecret || secret !== configSecret) {
+      throw new functions.https.HttpsError("permission-denied", "Invalid setup secret.");
+    }
+
+    await admin.auth().setCustomUserClaims(uid, { admin: true });
+    await bootstrapRef.set({ initialized: true, first_admin_uid: uid, setup_at: admin.firestore.FieldValue.serverTimestamp() });
+    return { success: true, message: "Admin claim set." };
+  }
+
+  // After bootstrap: only existing admins can promote others
+  if (!context.auth?.token?.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const { uid } = data;
+  await admin.auth().setCustomUserClaims(uid, { admin: true });
+  await logAdminAction("admin_promoted", { promoted_uid: uid }, context.auth.token.email);
+  return { success: true };
+});
+
+// ─── CALLABLE: GET DASHBOARD STATS ───────────────────────────────────────────
+exports.getDashboardStats = functions.https.onCall(async (data, context) => {
+  if (!context.auth?.token?.admin) {
+    throw new functions.https.HttpsError("permission-denied", "Admin access required.");
+  }
+
+  const [codesSnap, paymentsSnap, statsSnap] = await Promise.all([
+    db.collection("codes").get(),
+    db.collection("payments").where("status", "==", "paid").orderBy("verified_at", "desc").limit(30).get(),
+    db.collection("admin_stats").doc("revenue").get(),
+  ]);
+
+  const now = new Date();
+  let used = 0, unused = 0, disabled = 0, expired = 0;
+
+  codesSnap.forEach(d => {
+    const c = d.data();
+    if (c.status === "disabled") { disabled++; return; }
+    if (c.expires_at) {
+      const exp = c.expires_at.toDate ? c.expires_at.toDate() : new Date(c.expires_at);
+      if (now > exp) { expired++; return; }
+    }
+    if (c.status === "used") used++;
+    else unused++;
+  });
+
+  const revenueStats = statsSnap.exists ? statsSnap.data() : {};
+
+  // Monthly revenue (last 6 months)
+  const monthlyRevenue = {};
+  paymentsSnap.forEach(d => {
+    const p = d.data();
+    if (p.verified_at) {
+      const date = p.verified_at.toDate ? p.verified_at.toDate() : new Date(p.verified_at);
+      const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+      monthlyRevenue[key] = (monthlyRevenue[key] || 0) + (p.amount || 0);
+    }
+  });
+
+  return {
+    codes: { total: codesSnap.size, used, unused, disabled, expired },
+    revenue: {
+      total: revenueStats.total_revenue || 0,
+      byPlan: (() => {
+        const plans = {};
+        Object.keys(PLANS).forEach(k => { plans[k] = revenueStats[`revenue_${k}`] || 0; });
+        return plans;
+      })(),
+      totalPaid: revenueStats.total_paid || 0,
+      monthly: monthlyRevenue,
+    },
+  };
+});
+
+// ─── SCHEDULED: AUTO-EXPIRE CLEANUP (Daily) ───────────────────────────────────
+exports.cleanupExpiredCodes = functions.pubsub.schedule("every 24 hours").onRun(async () => {
+  const now = admin.firestore.Timestamp.now();
+  const expiredSnap = await db.collection("codes")
+    .where("status", "==", "unused")
+    .where("expires_at", "<", now)
+    .get();
+
+  const batch = db.batch();
+  expiredSnap.forEach(d => {
+    batch.update(d.ref, { status: "expired", expired_at: now });
+  });
+
+  if (!expiredSnap.empty) {
+    await batch.commit();
+    await logAdminAction("auto_expired_cleanup", { count: expiredSnap.size });
+    console.log(`Expired ${expiredSnap.size} codes.`);
+  }
+  return null;
+});
+
+// ─── HTTP: WEBHOOK RECEIVER (GCash / Payment Gateway) ────────────────────────
+// This endpoint receives webhooks from your payment gateway
+// Secure it with a signature secret: firebase functions:config:set webhook.secret="..."
+exports.paymentWebhook = functions.https.onRequest(async (req, res) => {
+  if (req.method !== "POST") return res.status(405).send("Method not allowed");
+
+  // Verify webhook signature
+  const webhookSecret = functions.config().webhook?.secret;
+  if (webhookSecret) {
+    const signature = req.headers["x-webhook-signature"];
+    const expected = crypto
+      .createHmac("sha256", webhookSecret)
+      .update(JSON.stringify(req.body))
+      .digest("hex");
+    if (signature !== expected) {
+      console.warn("Invalid webhook signature");
+      return res.status(401).send("Invalid signature");
+    }
+  }
+
+  try {
+    const { transaction_id, reference_number, amount, status } = req.body;
+
+    if (!transaction_id || status !== "success") {
+      return res.status(200).send("OK - ignored");
+    }
+
+    const payRef = db.collection("payments").doc(transaction_id);
+    const paySnap = await payRef.get();
+
+    if (!paySnap.exists) {
+      return res.status(404).send("Transaction not found");
+    }
+
+    const payment = paySnap.data();
+    if (payment.status === "paid") {
+      return res.status(200).send("Already processed");
+    }
+
+    // Auto-fulfill via internal logic (same as admin verify, but webhook-triggered)
+    const confirmedAmount = parseFloat(amount);
+    if (confirmedAmount !== payment.amount) {
+      await payRef.update({ status: "amount_mismatch", flagged: true, webhook_data: req.body });
+      await logAdminAction("webhook_amount_mismatch", { transaction_id, expected: payment.amount, received: confirmedAmount });
+      return res.status(200).send("OK - flagged");
+    }
+
+    // Generate code
+    let code;
+    let attempts = 0;
+    do {
+      code = generateSecureCode();
+      const existing = await db.collection("codes").doc(code).get();
+      if (!existing.exists) break;
+      attempts++;
+    } while (attempts < 5);
+
+    const planInfo = PLANS[payment.plan];
+    const expiresAt = planInfo.durationDays ? new Date(Date.now() + planInfo.durationDays * 86400000) : null;
+
+    await db.runTransaction(async (t) => {
+      t.set(db.collection("codes").doc(code), {
+        status: "unused",
+        plan: payment.plan,
+        created_at: admin.firestore.FieldValue.serverTimestamp(),
+        created_by: "webhook_automation",
+        transaction_id,
+        email: payment.email,
+        used_by_session: null,
+        used_at: null,
+        expires_at: expiresAt ? admin.firestore.Timestamp.fromDate(expiresAt) : null,
+      });
+
+      t.update(payRef, {
+        status: "paid",
+        activation_code: code,
+        reference_number: reference_number || null,
+        code_generated: true,
+        verified_at: admin.firestore.FieldValue.serverTimestamp(),
+        verified_by: "webhook",
+        webhook_data: req.body,
+      });
+
+      t.set(db.collection("admin_stats").doc("revenue"), {
+        [`revenue_${payment.plan}`]: admin.firestore.FieldValue.increment(payment.amount),
+        total_revenue: admin.firestore.FieldValue.increment(payment.amount),
+        total_paid: admin.firestore.FieldValue.increment(1),
+        last_updated: admin.firestore.FieldValue.serverTimestamp(),
+      }, { merge: true });
+    });
+
+    // Send email
+    try {
+      await sendActivationEmail(payment.email, code, payment.plan, transaction_id);
+      await payRef.update({ email_sent: true });
+    } catch (e) {
+      console.error("Webhook email error:", e);
+    }
+
+    await logAdminAction("webhook_payment_fulfilled", { transaction_id, code, email: payment.email });
+    return res.status(200).send("OK");
+
+  } catch (err) {
+    console.error("Webhook error:", err);
+    return res.status(500).send("Internal error");
+  }
+});
+
+// ─── CALLABLE: VERIFY ACCESS CODE ─────────────────────────────────────────────
+// Replaces client-side code verification. Validates code server-side and
+// updates usage tracking. Download URLs are never exposed to the client
+// through this function.
+exports.verifyAccessCode = functions.https.onCall(async (data, context) => {
+  const { code, email, sessionId } = data;
+
+  if (!code || !sessionId) {
+    throw new functions.https.HttpsError("invalid-argument", "Code and session ID required.");
+  }
+
+  const normalized = code.toUpperCase().replace(/-/g, "");
+  if (normalized.length !== 12) {
+    return { ok: false, error: "Invalid format." };
+  }
+  const codeKey = normalized.substring(0,4)+"-"+normalized.substring(4,8)+"-"+normalized.substring(8,12);
+
+  const codeRef = db.collection("codes").doc(codeKey);
+  const snap = await codeRef.get();
+
+  if (!snap.exists) {
+    return { ok: false, error: "Code not found." };
+  }
+
+  const data_ = snap.data();
+
+  if (data_.status === "disabled") {
+    return { ok: false, error: "This code has been disabled." };
+  }
+
+  let expiresAt = null;
+  if (data_.expires_at) {
+    const expiry = data_.expires_at.toDate ? data_.expires_at.toDate() : new Date(data_.expires_at);
+    if (new Date() > expiry) {
+      return { ok: false, error: "Code has expired." };
+    }
+    expiresAt = expiry.getTime();
+  }
+
+  // Determine tier from max_devices
+  const maxDevices = data_.max_devices || 1;
+  const isLifetime = maxDevices >= 999 || maxDevices === -1;
+
+  let tier = "elite";
+  if (isLifetime) tier = "vip";
+  else if (maxDevices <= 1) tier = "member";
+
+  const normalEmail = (email || "").trim().toLowerCase();
+  const usedSessions = data_.used_sessions || [];
+  const usedEmails = data_.used_emails || [];
+
+  // Email limit check — skip for lifetime
+  if (!isLifetime && email) {
+    if (!normalEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalEmail)) {
+      return { ok: false, error: "Please enter a valid email address." };
+    }
+    if (!usedEmails.includes(normalEmail) && usedEmails.length >= maxDevices) {
+      return { ok: false, error: "Email limit reached." };
+    }
+  }
+
+  // Session/device limit check
+  let newSessions = [...usedSessions];
+  if (!isLifetime && !newSessions.includes(sessionId) && newSessions.length >= maxDevices) {
+    return { ok: false, error: "Device limit reached." };
+  }
+  if (!newSessions.includes(sessionId)) {
+    newSessions.push(sessionId);
+  }
+
+  let newEmails = [...usedEmails];
+  if (normalEmail && !newEmails.includes(normalEmail)) {
+    newEmails.push(normalEmail);
+  }
+
+  // Update code usage
+  const updateData = {
+    used_sessions: newSessions,
+    used_emails: newEmails,
+  };
+  if (data_.status !== "used") {
+    updateData.status = "used";
+    updateData.used_at = admin.firestore.FieldValue.serverTimestamp();
+  }
+  await codeRef.update(updateData);
+
+  return { ok: true, codeKey, expiresAt, tier };
+});
+
+// ─── CALLABLE: GET GAMES LIST (no downloadUrl) ────────────────────────────────
+// Returns game metadata for catalog display. Download URLs are NOT included
+// — they are served separately via getGameDownloadUrl after code verification.
+exports.getGamesList = functions.https.onCall(async (data, context) => {
+  const snap = await db.collection("games").get();
+  const games = snap.docs.map(d => {
+    const d_ = d.data();
+    // Strip downloadUrl — must be fetched via getGameDownloadUrl
+    const { downloadUrl, ...meta } = d_;
+    return { ...meta, id: d.id, _source: "firestore" };
+  });
+  return { games };
+});
+
+// ─── TIER HELPERS ─────────────────────────────────────────────────────────────
+const TIER_HIERARCHY = { member: 0, elite: 1, vip: 2 };
+
+function codeTierFromData(d_) {
+  const maxDevices = d_.max_devices || 1;
+  const isLifetime = maxDevices >= 999 || maxDevices === -1;
+  if (isLifetime) return "vip";
+  if (maxDevices <= 1) return "member";
+  return "elite";
+}
+
+function tierAllows(userTier, gameMembership) {
+  if (!gameMembership || gameMembership.toLowerCase() === "all") return true;
+  const required = gameMembership.toLowerCase();
+  if (!TIER_HIERARCHY.hasOwnProperty(required)) return true;
+  return TIER_HIERARCHY[userTier] >= TIER_HIERARCHY[required];
+}
+
+// ─── CALLABLE: GET GAME DOWNLOAD URL ─────────────────────────────────────────
+// Verifies the code is still valid, checks tier access, increments download
+// counter, and returns the download URL. Never exposes URLs to unverified clients.
+exports.getGameDownloadUrl = functions.https.onCall(async (data, context) => {
+  const { gameId, codeKey } = data;
+
+  if (!gameId) {
+    throw new functions.https.HttpsError("invalid-argument", "Game ID required.");
+  }
+
+  let userTier = "member";
+
+  // Verify code is still valid and determine user's tier
+  if (codeKey) {
+    const codeSnap = await db.collection("codes").doc(codeKey).get();
+    if (!codeSnap.exists) {
+      return { ok: false, error: "Code not found." };
+    }
+    const codeData = codeSnap.data();
+    if (codeData.status === "disabled") {
+      return { ok: false, error: "Code disabled." };
+    }
+    if (codeData.expires_at) {
+      const expiry = codeData.expires_at.toDate ? codeData.expires_at.toDate() : new Date(codeData.expires_at);
+      if (new Date() > expiry) {
+        return { ok: false, error: "Code expired." };
+      }
+    }
+    userTier = codeTierFromData(codeData);
+  }
+
+  // Read game doc
+  const gameSnap = await db.collection("games").doc(gameId).get();
+  if (!gameSnap.exists) {
+    return { ok: false, error: "Game not found." };
+  }
+
+  const game = gameSnap.data();
+
+  // Check tier access
+  if (!tierAllows(userTier, game.membership)) {
+    return { ok: false, error: "Your plan does not include this game." };
+  }
+
+  if (!game.downloadUrl || game.downloadUrl === "#") {
+    return { ok: false, error: "No download available." };
+  }
+
+  // Increment download counter
+  await gameSnap.ref.update({
+    downloads: admin.firestore.FieldValue.increment(1),
+  });
+
+  return { ok: true, downloadUrl: game.downloadUrl };
+});
+
+// ─── CALLABLE: GET SOFTWARE LIST (no downloadUrl) ─────────────────────────────
+// Returns software metadata only. Download URLs are served separately via
+// getSoftwareDownloadUrl after implicit code verification.
+exports.getSoftwareList = functions.https.onCall(async (data, context) => {
+  const snap = await db.collection("software").orderBy("name").get();
+  const items = snap.docs.map(d => {
+    const d_ = d.data();
+    const { downloadUrl, ...meta } = d_;
+    return { ...meta, id: d.id };
+  });
+  return { software: items };
+});
+
+// ─── CALLABLE: GET SOFTWARE DOWNLOAD URL ──────────────────────────────────────
+// Returns the download URL for a software item. Called after the user has
+// been verified (code gate). No separate codeKey check since this page
+// is only accessible after code verification.
+exports.getSoftwareDownloadUrl = functions.https.onCall(async (data, context) => {
+  const { swId, codeKey } = data;
+
+  if (!swId) {
+    throw new functions.https.HttpsError("invalid-argument", "Software ID required.");
+  }
+
+  // Verify code is still valid
+  if (codeKey) {
+    const codeSnap = await db.collection("codes").doc(codeKey).get();
+    if (!codeSnap.exists) {
+      return { ok: false, error: "Code not found." };
+    }
+    const codeData = codeSnap.data();
+    if (codeData.status === "disabled") {
+      return { ok: false, error: "Code disabled." };
+    }
+    if (codeData.expires_at) {
+      const expiry = codeData.expires_at.toDate ? codeData.expires_at.toDate() : new Date(codeData.expires_at);
+      if (new Date() > expiry) {
+        return { ok: false, error: "Code expired." };
+      }
+    }
+  }
+
+  const swSnap = await db.collection("software").doc(swId).get();
+  if (!swSnap.exists) {
+    return { ok: false, error: "Software not found." };
+  }
+
+  const sw = swSnap.data();
+  if (!sw.downloadUrl || sw.downloadUrl === "#") {
+    return { ok: false, error: "No download available." };
+  }
+
+  return { ok: true, downloadUrl: sw.downloadUrl };
+});
+
+// ─── CALLABLE: CHECK CODE STATUS ──────────────────────────────────────────────
+// Used by clients to poll whether their code is still valid (replaces
+// onSnapshot listener on the codes collection).
+exports.checkCodeStatus = functions.https.onCall(async (data, context) => {
+  const { codeKey } = data;
+
+  if (!codeKey) {
+    throw new functions.https.HttpsError("invalid-argument", "Code key required.");
+  }
+
+  const snap = await db.collection("codes").doc(codeKey).get();
+
+  if (!snap.exists) {
+    return { exists: false, status: "deleted" };
+  }
+
+  const d = snap.data();
+  const status = d.status;
+
+  if (status === "disabled") {
+    return { exists: true, status: "disabled" };
+  }
+
+  let expiresAt = null;
+  if (d.expires_at) {
+    const expiry = d.expires_at.toDate ? d.expires_at.toDate() : new Date(d.expires_at);
+    expiresAt = expiry.getTime();
+    if (new Date() > expiry) {
+      return { exists: true, status: "expired", expiresAt };
+    }
+  }
+
+  return { exists: true, status: "active", expiresAt };
+});
+
+// ─── CALLABLE: GET ORDER STATUS ───────────────────────────────────────────────
+// Allows users to check their order status after payment submission.
+exports.getOrderStatus = functions.https.onCall(async (data, context) => {
+  const { orderId } = data;
+
+  if (!orderId) {
+    throw new functions.https.HttpsError("invalid-argument", "Order ID required.");
+  }
+
+  const snap = await db.collection("orders").doc(orderId).get();
+
+  if (!snap.exists) {
+    return { exists: false };
+  }
+
+  const d = snap.data();
+  return {
+    exists: true,
+    status: d.status,
+    code: d.code || null,
+    plan: d.plan || null,
+    days: d.days || null,
+    devices: d.devices || null,
+    email: d.email || null,
+  };
+});
+
