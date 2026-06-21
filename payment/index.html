@@ -629,7 +629,7 @@
 <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/@emailjs/browser@4/dist/email.min.js"></script>
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getFirestore, doc, setDoc, getDocs, query, collection, where, serverTimestamp, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+  import { getFirestore, doc, setDoc, getDocs, query, collection, where, onSnapshot, serverTimestamp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   // ---------- EMAILJS CONFIG (original) ----------
   const EMAILJS_PUBLIC_KEY  = 'AIK-MdQg9DeDaqyEn';
@@ -654,8 +654,6 @@
   };
   const app = initializeApp(firebaseConfig);
   const db = getFirestore(app);
-
-
 
   let flowStep = 1;
   let selectedPlanKey = '';
@@ -765,27 +763,25 @@
 
   function startOrderListener(oid) {
     if (orderUnsub) orderUnsub();
-    orderUnsub = onSnapshot(doc(db, 'orders', oid), snap => {
-      if (!snap.exists) return;
+    orderUnsub = onSnapshot(doc(db, 'orders', oid), async (snap) => {
+      if (!snap.exists()) return;
       const data = snap.data();
       if (data.status === 'approved' && data.code) {
-        orderUnsub();
-        orderUnsub = null;
+        if (orderUnsub) { orderUnsub(); orderUnsub = null; }
         document.getElementById('successCode').innerHTML = data.code;
         document.getElementById('successCodeDisplay').style.display = 'block';
         goTo(5);
         const expiry = data.days === -1 ? 'Lifetime' : data.days + ' day' + (data.days > 1 ? 's' : '');
         const devInfo = data.devices === -1 ? 'Any device' : data.devices + ' device' + (data.devices > 1 ? 's' : '');
         try {
-          window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
+          await window.emailjs.send(EMAILJS_SERVICE_ID, EMAILJS_TEMPLATE_ID, {
             to_email: data.email, to_name: data.email.split('@')[0], code: data.code,
             plan: data.plan + ' (' + expiry + ', ' + devInfo + ')', expiry: expiry + ' · ' + devInfo
           });
         } catch(e) { console.warn("email send issue"); }
       }
       if (data.status === 'rejected') {
-        orderUnsub();
-        orderUnsub = null;
+        if(orderUnsub) orderUnsub();
         const waitingDiv = document.querySelector('#sec-waiting .waiting-box');
         if(waitingDiv) waitingDiv.innerHTML = `<div style="font-size:48px;">✗</div><h2>Payment not verified</h2><p>Reference invalid. Contact support.</p><a href=".." style="color:#3b82f6;">← Back</a>`;
       }
