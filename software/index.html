@@ -318,9 +318,7 @@
 
 <script type="module">
   import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import {
-    getFunctions, httpsCallable
-  } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-functions.js';
+  import { getFirestore, doc, collection, getDoc, getDocs, updateDoc, arrayUnion, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
   const firebaseConfig = {
     apiKey: 'AIzaSyCntbq001YBLq3ZDqw9D-tRInDnhX631bM',
@@ -332,11 +330,7 @@
   };
 
   const app = initializeApp(firebaseConfig);
-  const functions_ = getFunctions(app);
-  const verifyCodeFn = httpsCallable(functions_, 'verifyAccessCode');
-  const getSoftwareListFn = httpsCallable(functions_, 'getSoftwareList');
-  const getSoftwareDownloadUrlFn = httpsCallable(functions_, 'getSoftwareDownloadUrl');
-  const checkCodeStatusFn = httpsCallable(functions_, 'checkCodeStatus');
+  const db = getFirestore(app);
 
   const KEY_ACCESS = 'gv_access';
   const KEY_CODE = 'gv_code';
@@ -405,28 +399,23 @@
     expiryInterval = setInterval(update, 1000);
   }
 
-  let statusPollInterval = null;
-
   function startLiveListener(codeKey) {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
     if (!codeKey) return;
-    async function poll() {
-      try {
-        const res = await checkCodeStatusFn({ codeKey });
-        const s = res.data;
-        if (!s.exists) { showRevoked('deleted'); return; }
-        if (s.status === 'disabled') { showRevoked('disabled'); return; }
-        if (s.status === 'expired') { showRevoked('expired'); return; }
-        if (s.expiresAt) startExpiryTicker(s.expiresAt);
-      } catch {}
-    }
-    poll();
-    statusPollInterval = setInterval(poll, 30000);
+    liveUnsubscribe = onSnapshot(doc(db, 'codes', codeKey), snap => {
+      if (!snap.exists) { showRevoked('deleted'); return; }
+      const data = snap.data();
+      if (data.status === 'disabled') { showRevoked('disabled'); return; }
+      if (data.expires_at) {
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) { showRevoked('expired'); return; }
+        startExpiryTicker(expiresAt);
+      }
+    });
   }
 
   function stopLiveListener() {
     if (liveUnsubscribe) { liveUnsubscribe(); liveUnsubscribe = null; }
-    if (statusPollInterval) { clearInterval(statusPollInterval); statusPollInterval = null; }
   }
 
   function showRevoked(reason) {
@@ -475,17 +464,50 @@
     if (normalized.length !== 12) { if (!silent) showError('Invalid format.'); return { ok: false }; }
     const codeKey = normalized.substring(0,4)+'-'+normalized.substring(4,8)+'-'+normalized.substring(8,12);
     try {
-      const res = await verifyCodeFn({ code: codeKey, email, sessionId: getSessionId() });
-      const result = res.data;
-      if (!result.ok) {
-        if (!silent) showError(result.error || 'Verification failed.');
+      const snap = await getDoc(doc(db, 'codes', codeKey));
+      if (!snap.exists()) {
+        if (!silent) showError('Code not found.');
         return { ok: false };
       }
-      _setAccess(result.codeKey);
-      localStorage.setItem(KEY_CODE, result.codeKey);
-      localStorage.setItem('gv_tier', result.tier);
-      if (email) localStorage.setItem(KEY_EMAIL, email.trim().toLowerCase());
-      return { ok: true, codeKey: result.codeKey, expiresAt: result.expiresAt, tier: result.tier };
+      const data = snap.data();
+      if (data.status === 'disabled') {
+        if (!silent) showError('This code has been disabled.');
+        return { ok: false };
+      }
+      if (data.expires_at) {
+        const expiresAt = data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000;
+        if (Date.now() > expiresAt) {
+          if (!silent) showError('Code has expired.');
+          return { ok: false };
+        }
+      }
+      const usedSessions = data.used_sessions || [];
+      const sessionId = getSessionId();
+      const emailLower = (email || '').trim().toLowerCase();
+      if (data.max_devices && data.max_devices > 0 && usedSessions.length >= data.max_devices) {
+        if (!usedSessions.includes(sessionId) && !(data.used_emails || []).includes(emailLower)) {
+          if (!silent) showError('Max devices reached.');
+          return { ok: false };
+        }
+      }
+      const updates = {};
+      if (!usedSessions.includes(sessionId)) {
+        updates.used_sessions = arrayUnion(sessionId);
+      }
+      if (email && !(data.used_emails || []).includes(emailLower)) {
+        updates.used_emails = arrayUnion(emailLower);
+      }
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(doc(db, 'codes', codeKey), updates);
+      }
+      _setAccess(codeKey);
+      localStorage.setItem(KEY_CODE, codeKey);
+      localStorage.setItem('gv_tier', data.tier || 'member');
+      if (email) localStorage.setItem(KEY_EMAIL, emailLower);
+      const expiresAt = data.expires_at
+        ? (data.expires_at.toMillis ? data.expires_at.toMillis() : data.expires_at.seconds * 1000)
+        : null;
+      return { ok: true, codeKey, expiresAt, tier: data.tier || 'member' };
     } catch (err) {
       if (!silent) showError('Verification failed. Please try again.');
       return { ok: false };
@@ -523,13 +545,12 @@
   async function loadSoftware() {
     const container = document.getElementById('swBody');
     try {
-      const res = await getSoftwareListFn();
-      const items = res.data?.software || [];
+      const snap = await getDocs(collection(db, 'software'));
+      const items = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       if (!items.length) {
         container.innerHTML = '<div class="sw-note" style="text-align:center;padding:40px;">No software available yet. Check back later.</div>';
         return;
       }
-      const codeKey = localStorage.getItem(KEY_CODE);
       const groups = {};
       for (const item of items) {
         const cat = item.category || 'Other';
@@ -560,9 +581,9 @@
         btn.addEventListener('click', async e => {
           const id = btn.dataset.swId;
           try {
-            const res = await getSoftwareDownloadUrlFn({ swId: id, codeKey });
-            if (res.data?.ok && res.data?.downloadUrl) {
-              window.open(res.data.downloadUrl, '_blank', 'noopener');
+            const swDoc = await getDoc(doc(db, 'software', id));
+            if (swDoc.exists() && swDoc.data().downloadUrl) {
+              window.open(swDoc.data().downloadUrl, '_blank', 'noopener');
             } else {
               showToast('Access denied', 2000);
             }
