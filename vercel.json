@@ -1,4 +1,12 @@
 {
   "cleanUrls": true,
-  "trailingSlash": false
+  "trailingSlash": false,
+  "functions": {
+    "api/proxy.js": {
+      "runtime": "vercel-runtime-nodejs@2"
+    }
+  },
+  "rewrites": [
+    { "source": "/dl", "destination": "/api/proxy" }
+  ]
 }
